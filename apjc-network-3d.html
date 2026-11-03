@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>APJC Logistics – แบบเครือข่าย 3 มิติ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#eef1f4; --surface:#ffffff; --surface2:#e3e8ee; --ink:#14202b; --muted:#4b5a69;
+  --line:#cfd7e0; --yellow:#f2b705; --yellow-ink:#5a4300; --aqua:#0b7f8a; --red:#c93838; --green:#167a4a; --violet:#6d3fc0;
+  --scene1:#dfe6ee; --scene2:#f7f9fb; --lbl-bg:rgba(255,255,255,.88); --lbl-ink:#14202b;
+  color-scheme: light;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d151e; --surface:#141f2b; --surface2:#1b2836; --ink:#e4ebf2; --muted:#9db0c2;
+    --line:#2a3a4b; --yellow:#f5c330; --yellow-ink:#f5c330; --aqua:#34c6d3; --red:#f06b6b; --green:#4cd38a; --violet:#b49cff;
+    --scene1:#0a1119; --scene2:#16222f; --lbl-bg:rgba(16,25,35,.86); --lbl-ink:#e4ebf2;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d151e; --surface:#141f2b; --surface2:#1b2836; --ink:#e4ebf2; --muted:#9db0c2;
+  --line:#2a3a4b; --yellow:#f5c330; --yellow-ink:#f5c330; --aqua:#34c6d3; --red:#f06b6b; --green:#4cd38a; --violet:#b49cff;
+  --scene1:#0a1119; --scene2:#16222f; --lbl-bg:rgba(16,25,35,.86); --lbl-ink:#e4ebf2;
+  color-scheme: dark;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans Thai",Tahoma,"Noto Sans Thai",system-ui,sans-serif;font-size:16px;line-height:1.7}
+a{color:var(--aqua)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
+
+header.top{padding:28px clamp(16px,4vw,48px) 18px;display:flex;flex-wrap:wrap;gap:12px 32px;align-items:flex-end;justify-content:space-between}
+header.top h1{margin:0;font-size:clamp(26px,3.6vw,40px);line-height:1.2;font-weight:700;letter-spacing:-.01em;max-width:22ch}
+header.top p{margin:6px 0 0;color:var(--muted);max-width:60ch}
+.hazard{height:8px;background:repeating-linear-gradient(-45deg,var(--yellow) 0 14px,#1d2731 14px 28px)}
+
+/* viewer */
+.viewer-wrap{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--surface)}
+@media (max-width:980px){.viewer-wrap{grid-template-columns:1fr}}
+.stage{position:relative;height:min(78vh,780px);min-height:460px;background:radial-gradient(120% 90% at 50% 20%,var(--scene2),var(--scene1));overflow:hidden;touch-action:none}
+.stage canvas{display:block;width:100%;height:100%;cursor:grab}
+.stage canvas.dragging{cursor:grabbing}
+.labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;left:0;top:0;white-space:nowrap;font-size:12px;line-height:1.3;padding:2px 7px;border-radius:4px;background:var(--lbl-bg);color:var(--lbl-ink);border:1px solid var(--line);transform-origin:50% 100%;will-change:transform}
+.lbl.major{font-weight:600}
+.lbl.zone{background:transparent;border:none;font-weight:700;font-size:14px;color:var(--muted)}
+.lbl.tier{background:var(--yellow);color:#1d2731;border:none;font-weight:600}
+.lbl.dim{opacity:.25}
+.lbl.down{background:var(--red);color:#fff;border-color:var(--red)}
+.lbl.hide{display:none}
+.lbl.type-core{border-left:4px solid #6366f1}.lbl.type-dist,.lbl.type-dcsw{border-left:4px solid #3b82f6}
+.lbl.type-access{border-left:4px solid #0ea5e9}.lbl.type-fw,.lbl.type-isp{border-left:4px solid #f07a2a}
+.lbl.type-ap{border-left:4px solid #16a085}.lbl.type-server{border-left:4px solid #8b5cf6}
+.lbl.type-branch,.lbl.type-dr,.lbl.type-cloud{border-left:4px solid #64748b}
+.lbl.type-vpn,.lbl.type-vfw,.lbl.type-lb,.lbl.type-vm,.lbl.type-db,.lbl.type-storage,.lbl.type-vault,.lbl.type-dns{border-left:4px solid #3b82f6}
+.lbl.type-ep,.lbl.type-endpoint,.lbl.type-scan,.lbl.type-guest{border-left:4px solid #e0a400}
+
+.toolbar{position:absolute;left:12px;right:12px;top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;pointer-events:none}
+.toolbar > *{pointer-events:auto}
+.seg{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:3px}
+.seg button{border:0;background:transparent;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.tbtn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 12px;cursor:pointer;font-size:14px}
+.hint{position:absolute;right:12px;bottom:12px;font-size:12px;color:var(--muted);background:var(--lbl-bg);padding:4px 8px;border-radius:6px;pointer-events:none}
+.legend{position:absolute;left:12px;bottom:12px;background:var(--lbl-bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.5;max-width:240px}
+.legend summary{cursor:pointer;font-weight:600}
+.legend ul{list-style:none;margin:6px 0 0;padding:0}
+.legend li{display:flex;gap:8px;align-items:center}
+.legend i{display:inline-block;width:22px;height:0;border-top:3px solid currentColor}
+.legend i.d{border-top-style:dashed}
+
+.side{border-left:1px solid var(--line);display:flex;flex-direction:column;max-height:min(78vh,780px);min-height:460px}
+@media (max-width:980px){.side{border-left:0;border-top:1px solid var(--line);max-height:none;min-height:0}}
+.scen{padding:14px 16px;border-bottom:1px solid var(--line)}
+.scen h2{font-size:15px;margin:0 0 8px;font-weight:700}
+.scen-list{display:flex;flex-wrap:wrap;gap:6px}
+.scen-list button{border:1px solid var(--line);background:var(--surface2);border-radius:999px;padding:4px 11px;font-size:13px;cursor:pointer}
+.scen-list button[aria-pressed="true"]{background:var(--yellow);border-color:var(--yellow);color:#1d2731;font-weight:600}
+.panel{padding:16px;overflow:auto;flex:1}
+.panel h3{margin:0 0 4px;font-size:19px;line-height:1.35}
+.panel .layer{display:inline-block;font-size:12px;padding:1px 8px;border-radius:4px;background:var(--surface2);color:var(--muted);margin-bottom:10px}
+.panel dl{margin:0}
+.panel dt{font-weight:600;font-size:13px;color:var(--muted);margin-top:12px}
+.panel dd{margin:2px 0 0}
+.panel .scn-box{border-left:4px solid var(--yellow);padding:4px 0 4px 12px;margin-bottom:14px}
+.panel .scn-box.bad{border-color:var(--red)}
+.panel .scn-box.good{border-color:var(--green)}
+.panel p{margin:6px 0}
+.panel ul{margin:6px 0;padding-left:20px}
+
+/* content */
+main{max-width:1180px;margin:0 auto;padding:24px clamp(16px,4vw,40px) 80px}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px 14px;padding:14px 0 6px;border-bottom:1px solid var(--line);margin-bottom:8px;font-size:14px}
+nav.toc a{text-decoration:none;color:var(--muted)}
+nav.toc a:hover{color:var(--ink)}
+section.s{padding:36px 0 8px;border-bottom:1px solid var(--line)}
+section.s > h2{font-size:clamp(22px,2.6vw,28px);line-height:1.3;margin:0 0 6px}
+section.s > .lead{color:var(--muted);max-width:72ch;margin:0 0 18px}
+h3.sub{font-size:18px;margin:26px 0 8px}
+p.body{max-width:76ch}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px 28px}
+.col h4{margin:0 0 4px;font-size:16px}
+.col p{margin:0;color:var(--ink)}
+.col .tag{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface);margin:10px 0 6px}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:640px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--surface2);font-weight:600;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num{white-space:nowrap;font-variant-numeric:tabular-nums}
+td code,p code{font-family:"IBM Plex Sans Thai",Tahoma,sans-serif;font-variant-numeric:tabular-nums;background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:.95em}
+.note{border-left:4px solid var(--aqua);padding:6px 14px;margin:14px 0;max-width:80ch;background:var(--surface)}
+.note.y{border-color:var(--yellow)}
+.steps{counter-reset:st;list-style:none;padding:0;margin:10px 0;max-width:80ch}
+.steps li{counter-increment:st;position:relative;padding:4px 0 10px 44px}
+.steps li::before{content:counter(st);position:absolute;left:0;top:4px;width:30px;height:30px;border-radius:50%;background:var(--ink);color:var(--bg);display:grid;place-items:center;font-weight:700;font-size:14px}
+.kpi{display:flex;flex-wrap:wrap;gap:12px 36px;margin:12px 0}
+.kpi div{min-width:150px}
+.kpi b{display:block;font-size:30px;line-height:1.1}
+.kpi span{color:var(--muted);font-size:14px}
+details.qa{border-bottom:1px solid var(--line);padding:10px 0;max-width:86ch}
+details.qa summary{cursor:pointer;font-weight:600}
+details.qa p{margin:8px 0 2px}
+footer{color:var(--muted);font-size:13px;text-align:center;padding:30px 16px}
+@media (prefers-reduced-motion: reduce){*{scroll-behavior:auto!important}}
+
+/* Model-only view: keep model navigation and scenario switching, hide supporting copy. */
+body{overflow:hidden}
+.hazard,header.top,main,footer{display:none!important}
+.viewer-wrap{display:block;position:relative;height:100vh;height:100dvh;border:0}
+.stage{height:100vh;height:100dvh;min-height:0}
+.legend,.hint{display:none!important}
+.side{position:absolute;z-index:2;left:12px;right:12px;bottom:12px;display:block;min-height:0;max-height:none;border:0;pointer-events:none}
+.scen{padding:0;border:0;background:transparent;pointer-events:auto}
+.scen h2{display:none!important}
+.panel{display:none;position:absolute;right:0;bottom:58px;width:min(380px,calc(100vw - 24px));max-height:min(56vh,520px);overflow:auto;padding:16px;background:var(--lbl-bg);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.24);backdrop-filter:blur(12px);pointer-events:auto}
+.side.has-selection .panel{display:block}
+.panel .detail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.panel .detail-head h3{margin:0 0 6px;font-size:18px;line-height:1.35}
+.panel .panel-close{flex:none;border:1px solid var(--line);border-radius:7px;background:var(--surface);cursor:pointer;padding:1px 8px;font-size:19px;line-height:1.4}
+.panel .ha-state{display:block;padding:8px 10px;margin:8px 0 12px;border-left:4px solid var(--green);background:var(--surface);border-radius:5px;font-size:13px}
+.panel .ha-state.gap{border-color:var(--yellow)}
+.panel .detail-label{font-size:12px;color:var(--muted);margin:10px 0 1px;font-weight:600}
+.panel .detail-value{margin:0}
+.scen-list{max-width:100%;padding:6px;background:var(--lbl-bg);border:1px solid var(--line);border-radius:10px;backdrop-filter:blur(8px)}
+.lbl{font-size:11px;padding:2px 6px;background:var(--lbl-bg);box-shadow:0 1px 4px rgba(0,0,0,.18)}
+</style>
+</head>
+<body>
+<div class="hazard" aria-hidden="true"></div>
+<header class="top">
+  <div>
+    <h1>APJC Logistics: แบบเครือข่ายใหม่ สำนักงานใหญ่ คลัง สาขา และ Cloud DR</h1>
+    <p>ลากเพื่อหมุน เลื่อนล้อเมาส์/บีบนิ้วเพื่อซูม คลิกอุปกรณ์เพื่ออ่านหน้าที่และเหตุผล แล้วลองกดสถานการณ์ “ถ้าอุปกรณ์เสีย” ด้านขวา</p>
+  </div>
+</header>
+
+<div class="viewer-wrap">
+  <div class="stage" id="stage">
+    <canvas id="c" aria-label="แผนภาพเครือข่าย 3 มิติ"></canvas>
+    <div class="labels" id="labels"></div>
+    <div class="toolbar">
+      <div class="seg" role="group" aria-label="มุมมอง">
+        <button id="vPhys" aria-pressed="true">มุมมองอาคารจริง</button>
+        <button id="vLog" aria-pressed="false">มุมมองแบ่งชั้น (Logical)</button>
+      </div>
+      <button class="tbtn" id="bLabels">ชื่อ: ทั้งหมด</button>
+      <button class="tbtn" id="bReset">รีเซ็ตกล้อง</button>
+      <button class="tbtn" id="bCloud">ดู Cloud DR</button>
+      <button class="tbtn" id="bSpin" aria-pressed="false">หมุนอัตโนมัติ</button>
+    </div>
+    <details class="legend" open>
+      <summary>สัญลักษณ์สาย</summary>
+      <ul>
+        <li><i style="color:#6f7cf0"></i>Fiber 40/100G (Core–Distribution)</li>
+        <li><i style="color:#14b8c8"></i>Fiber 10G (Uplink จากชั้น)</li>
+        <li><i style="color:#7aa35a"></i>สาย LAN + PoE</li>
+        <li><i class="d" style="color:#e0a400"></i>สาย HA/Stack (คู่สำรอง)</li>
+        <li><i class="d" style="color:#e6a817"></i>Wi-Fi</li>
+        <li><i style="color:#f07a2a"></i>Internet</li>
+        <li><i class="d" style="color:#9b5cf0"></i>อุโมงค์ SD-WAN/VPN</li>
+        <li><i class="d" style="color:#22b36b"></i>Replication ไป Cloud DR</li>
+      </ul>
+    </details>
+    <div class="hint">จุดเล็กที่วิ่งบนสาย = ข้อมูลที่กำลังส่ง</div>
+  </div>
+  <aside class="side">
+    <div class="scen">
+      <h2>ทดลองสถานการณ์</h2>
+      <div class="scen-list" id="scenList"></div>
+    </div>
+    <div class="panel" id="panel" aria-live="polite"></div>
+  </aside>
+</div>
+
+<main>
+<nav class="toc" aria-label="สารบัญ">
+  <a href="#req">ความต้องการ → การออกแบบ</a>
+  <a href="#layers">Core / Distribution / Access</a>
+  <a href="#redundancy">Redundancy</a>
+  <a href="#vlan">VLAN / IP Plan</a>
+  <a href="#branch">การเชื่อมสาขา</a>
+  <a href="#wifi">Wi-Fi</a>
+  <a href="#security">Security</a>
+  <a href="#dr">DR บน Cloud</a>
+  <a href="#bom">รายการอุปกรณ์</a>
+  <a href="#qa">เตรียมตอบคำถาม</a>
+  <a href="#agenda">ลำดับนำเสนอ 30 นาที</a>
+</nav>
+
+<section class="s" id="req">
+  <h2>ความต้องการของลูกค้า และสิ่งที่เราออกแบบรองรับ</h2>
+  <p class="lead">ทุกการตัดสินใจในแบบนี้ผูกกับความต้องการข้อใดข้อหนึ่งของ APJC เสมอ คอลัมน์ขวาสุดคือคำอธิบายสำหรับผู้บริหารว่าธุรกิจได้อะไร</p>
+  <div class="kpi">
+    <div><b>520</b><span>ผู้ใช้ HQ ที่รองรับ (400 + 30%)</span></div>
+    <div><b>0</b><span>จุดเสียจุดเดียวที่ทำให้ Core/Internet ล่ม</span></div>
+    <div><b>12</b><span>กลุ่มเครือข่าย (VLAN) ที่แยกจากกันที่ HQ</span></div>
+    <div><b>≤ 4 ชม.</b><span>เวลากู้ ERP บน Cloud เมื่อ HQ ใช้งานไม่ได้</span></div>
+  </div>
+  <div class="tw"><table>
+    <thead><tr><th>ความต้องการ</th><th>สิ่งที่ออกแบบ</th><th>ประโยชน์ต่อธุรกิจ</th></tr></thead>
+    <tbody>
+      <tr><td>ระบบต้องไม่หยุดเมื่ออุปกรณ์ตัวใดเสีย โดยเฉพาะ Core และ Internet</td><td>Core Switch 2 ตัวทำงานคู่ (Stack/MLAG), Distribution เป็นคู่, ทุกชั้นมี Uplink 2 เส้นไปคนละตัว, Firewall 2 ตัวแบบ HA, Internet 2 ISP เข้าอาคารคนละเส้นทาง, UPS และไฟ 2 แหล่ง</td><td>อุปกรณ์เสียหนึ่งตัว พนักงานและคลังยังทำงานต่อ การรับ–ส่งสินค้าไม่สะดุด</td></tr>
+      <tr><td>สาขาเข้าถึง ERP อย่างปลอดภัย</td><td>SD-WAN สร้างอุโมงค์ IPsec เข้ารหัสจากสาขามา HQ, Internet 2 ทาง (Fiber + 4G/5G), Firewall อนุญาตเฉพาะพอร์ต ERP/File</td><td>ข้อมูลลูกค้าและการเงินไม่รั่วระหว่างทาง ใช้ Internet ธรรมดาได้ ไม่ต้องเช่าวงจรส่วนตัวราคาแพง</td></tr>
+      <tr><td>แยกพนักงาน แขก CCTV IP Phone และคลังออกจากกัน</td><td>แบ่ง VLAN ตามกลุ่ม + ACL ที่ Distribution + Zone บน Firewall, Wi-Fi แขกมี Gateway บน Firewall เท่านั้น</td><td>ถ้ามีเครื่องติดไวรัส ความเสียหายถูกจำกัดในกลุ่มเดียว แขกมองไม่เห็น ERP กล้องไม่ถูกใช้เป็นทางเจาะ</td></tr>
+      <tr><td>Wi-Fi ครอบคลุมทุกชั้นและคลัง</td><td>AP Wi-Fi 6 สำนักงาน 30 ตัว คลัง 16 ตัว, Controller คุมกลาง, Roaming เร็ว (802.11r/k/v), Site Survey ก่อนติดตั้ง</td><td>Scanner 80 เครื่องเดินทั่วคลังได้โดยไม่หลุด งานยิงบาร์โค้ดไม่ต้องรอ</td></tr>
+      <tr><td>ป้องกันพื้นฐานจาก Internet</td><td>Next-Generation Firewall: IPS, Anti-malware, URL Filtering, Application Control และ Log กลาง</td><td>ลดความเสี่ยง Ransomware และการโจมตีจากภายนอก</td></tr>
+      <tr><td>ขยายพนักงาน 30% ใน 3 ปี</td><td>คำนวณพอร์ตและ PoE เผื่อ 30%+, ช่วง IP ใหญ่กว่าความต้องการ 2 เท่า, โครงสร้างแบบ Block เพิ่มชั้น/สาขาได้โดยไม่รื้อ</td><td>ขยายองค์กรโดยซื้ออุปกรณ์เพิ่มทีละส่วน ไม่ต้องออกแบบใหม่</td></tr>
+      <tr><td>ข้อเสนอเพิ่มเติม: DR บน Cloud</td><td>Replicate ERP และ File Server ไป Cloud ต่อเนื่อง สาขามีอุโมงค์สำรองตรงไป Cloud</td><td>แม้ห้อง Server ไฟไหม้หรือน้ำท่วม ธุรกิจกลับมาใช้ ERP ได้ภายใน 4 ชั่วโมง ข้อมูลหายไม่เกิน 15 นาที</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="s" id="layers">
+  <h2>โครงสร้าง 3 ชั้น: Core / Distribution / Access</h2>
+  <p class="lead">เปรียบเหมือนระบบถนน: Access คือซอยหน้าบ้าน Distribution คือถนนสายหลักของแต่ละย่าน และ Core คือทางด่วนที่เชื่อมทุกย่านเข้าหากัน ออกแบบ HA ครบทั้งสามชั้น: Core และ Distribution มีอุปกรณ์เป็นคู่ ส่วน Access ใช้ Stack และ Uplink แยกเส้นทาง กดปุ่ม “มุมมองแบ่งชั้น” ในภาพ 3 มิติเพื่อดูแต่ละชั้นแยกกัน</p>
+  <div class="cols">
+    <div class="col"><h4><span class="tag" style="background:#6366f1"></span>Core Layer HA (2 ตัว)</h4><p>อยู่ในห้อง Server ชั้น 2 ทำหน้าที่ส่งข้อมูลความเร็วสูง (40/100G) ระหว่างบล็อกสำนักงาน บล็อกคลัง บล็อก Server และ Firewall ไม่ต่ออุปกรณ์ผู้ใช้ตรง ทั้งสองตัวทำงานพร้อมกันแบบ MLAG ถ้าตัวหนึ่งเสีย อีกตัวรับงานแทนในเวลาไม่ถึง 1 วินาที</p></div>
+    <div class="col"><h4><span class="tag" style="background:#3b82f6"></span>Distribution Layer HA (2 + 2 + Server 2)</h4><p>แต่ละบล็อกมี Switch 2 ตัวเป็นคู่สำรอง รวมสายจาก Access เป็น Default Gateway ของ VLAN ด้วย VRRP และบังคับใช้ ACL ระหว่างกลุ่ม ทุก Access ต่อ Uplink ไป Distribution ทั้งสองตัว และ Distribution แต่ละตัวเชื่อม Core ทั้งคู่</p></div>
+    <div class="col"><h4><span class="tag" style="background:#0ea5e9"></span>Access Layer HA (21 ตัว)</h4><p>แต่ละชั้นสำนักงานมี Switch 3 ตัวทำ Stack ส่วนคลังมี 3 โซน โซนละ 2 ตัวทำ Stack เป็นคู่สำรอง ทุก Stack มี Fiber 10G สองเส้นไป Distribution คนละตัว และกระจาย AP/อุปกรณ์สำคัญข้ามสมาชิก Stack</p></div>
+  </div>
+  <div class="note"><b>ทำไมไม่รวม Core กับ Distribution เป็นชั้นเดียว (Collapsed Core)?</b> สำหรับ 400 คนก็ทำได้ แต่ APJC มีคลังที่ทำงานตลอดวันและมีแผนขยาย การแยก Distribution ของคลังออกมาทำให้งานบำรุงรักษาหรือปัญหาฝั่งสำนักงานไม่กระทบการยิงบาร์โค้ด และเพิ่มอาคาร/โซนใหม่ได้โดยต่อ Distribution คู่ใหม่เข้า Core ทันที</div>
+  <h3 class="sub">ทำไมต้องใช้ PoE</h3>
+  <p class="body">IP Phone 150 เครื่อง กล้อง 60 ตัว และ AP 46 ตัว รับไฟจาก Switch ผ่านสาย LAN เส้นเดียว ไม่ต้องเดินปลั๊กไฟไปบนฝ้าหรือเพดานคลังสูง ติดตั้งเร็วและถูกกว่า และเมื่อไฟดับ UPS ที่ตู้ Switch จะเลี้ยงโทรศัพท์ กล้อง และ Wi-Fi ต่อได้จากจุดเดียว กล้องยังบันทึกภาพได้แม้ไฟดับ</p>
+  <p class="body">งบไฟ PoE ต่อชั้นโดยประมาณ: โทรศัพท์ 24 × 7 W + AP 6 × 25 W + กล้อง 5 × 12 W ≈ 380 W เราใช้ Switch PoE+ (802.3at) ชั้นละ 3 ตัว แต่ละตัวมีงบ ≥ 740 W จึงเหลือเผื่อการขยายและ AP รุ่นใหม่ที่กินไฟมากขึ้น</p>
+</section>
+
+<section class="s" id="redundancy">
+  <h2>Redundancy: ถ้าอุปกรณ์แต่ละตัวเสีย จะเกิดอะไรขึ้น</h2>
+  <p class="lead">ตารางนี้ใช้ตอบคำถาม “ถ้า Core เสียจะเป็นอย่างไร” และทุกบรรทัดลองดูได้จริงในปุ่มสถานการณ์ของภาพ 3 มิติ</p>
+  <div class="tw"><table>
+    <thead><tr><th>อุปกรณ์ที่เสีย</th><th>กลไกสำรอง</th><th>เวลาสลับ</th><th>ผลกระทบต่อผู้ใช้</th></tr></thead>
+    <tbody>
+      <tr><td>Core Switch 1 ตัว</td><td>MLAG/Stack: ทุกอุปกรณ์ต่อทั้ง 2 Core อยู่แล้ว ลิงก์ที่เหลือรับทราฟฟิกทั้งหมด</td><td class="num">&lt; 1 วินาที</td><td>ไม่รู้สึก</td></tr>
+      <tr><td>Firewall 1 ตัว</td><td>HA Active/Standby ซิงค์ Session ตลอด ตัว Standby รับ IP เดิมทันที</td><td class="num">1–3 วินาที</td><td>การเชื่อมต่อเดิมยังอยู่ อุโมงค์สาขาต่อใหม่อัตโนมัติ</td></tr>
+      <tr><td>Internet ISP 1 ราย</td><td>Firewall/SD-WAN ตรวจคุณภาพลิงก์และย้ายทราฟฟิกไป ISP อีกราย</td><td class="num">3–10 วินาที</td><td>วิดีโอคอลอาจกระตุกครู่เดียว</td></tr>
+      <tr><td>Distribution Switch 1 ตัว</td><td>VRRP ย้าย Gateway ไปอีกตัว; Access ยังมี Uplink อีกเส้น และ Distribution ที่เหลือยังต่อ Core ทั้งคู่</td><td class="num">&lt; 1 วินาที</td><td>อาจสะดุดช่วงสั้นระหว่างย้าย Gateway</td></tr>
+      <tr><td>Access Switch 1 ตัวใน Stack</td><td>สมาชิก Stack ที่เหลือทำงานต่อ; AP และอุปกรณ์สำคัญกระจายข้ามสมาชิก และมี Uplink ไป Distribution 2 ตัว</td><td class="num">ทันที</td><td>อุปกรณ์ที่ต่อกับตัวที่เสียหยุดจนกว่าจะย้ายสาย ส่วนจุดอื่นยังทำงาน</td></tr>
+      <tr><td>Access Uplink 1 เส้น</td><td>อีกเส้นยังเชื่อมไป Distribution อีกตัว</td><td class="num">ทันที</td><td>ไม่รู้สึก</td></tr>
+      <tr><td>Access Switch 1 ตัวในคลัง Stack</td><td>สมาชิก Stack อีกตัวและ Uplink ไป Distribution ทั้งสองตัวยังทำงานต่อ</td><td class="num">ทันที</td><td>เฉพาะอุปกรณ์ที่ต่อกับ Switch ตัวที่เสียหยุดจนกว่าจะย้ายสาย</td></tr>
+      <tr><td>Access Point 1 ตัว</td><td>AP ข้างเคียงครอบคลุมทับซ้อน 15–20%</td><td class="num">ทันที</td><td>สัญญาณเบาลงเล็กน้อยในจุดนั้น</td></tr>
+      <tr><td>ไฟฟ้าดับ</td><td>UPS ห้อง Server แบบ N+1 และ UPS ทุกตู้ชั้น + เครื่องปั่นไฟอาคาร, อุปกรณ์หลักมี Power Supply คู่</td><td class="num">ทันที</td><td>โทรศัพท์ กล้อง Wi-Fi ยังทำงาน</td></tr>
+      <tr><td>Internet หลักของสาขา</td><td>SD-WAN สลับไป 4G/5G อัตโนมัติ</td><td class="num">&lt; 10 วินาที</td><td>ยังเข้า ERP ได้ (ความเร็วลดลง)</td></tr>
+      <tr><td>ห้อง Server ใช้งานไม่ได้ทั้งห้อง</td><td>เปิด ERP และ File Server บน Cloud DR</td><td class="num">≤ 4 ชั่วโมง</td><td>สาขาและพนักงานทำงานต่อผ่าน Cloud</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="s" id="vlan">
+  <h2>VLAN / IP Plan</h2>
+  <p class="lead">ใช้หมายเลข VLAN เดียวกันทุกสถานที่ (เช่น VLAN 50 คือโทรศัพท์เสมอ) เพื่อให้ทีม IT จำง่าย แต่ละสถานที่ได้ช่วง <code>/16</code> ของตัวเอง ทำให้เขียน Firewall Policy และ Routing แบบสรุปได้ เช่น “ทุกอย่างจากสาขาชลบุรี = 10.21.0.0/16”</p>
+  <h3 class="sub">สำนักงานใหญ่และคลังสินค้า: 10.10.0.0/16</h3>
+  <div class="tw"><table>
+    <thead><tr><th>VLAN</th><th>ชื่อ</th><th>Subnet</th><th>ใช้ได้</th><th>ต้องการวันนี้ → ปีที่ 3</th><th>Gateway / หมายเหตุ</th></tr></thead>
+    <tbody>
+      <tr><td class="num">10</td><td>MGMT</td><td class="num">10.10.10.0/24</td><td class="num">254</td><td class="num">~70 → ~90</td><td>จัดการ Switch, AP, Firewall เข้าได้เฉพาะทีม IT</td></tr>
+      <tr><td class="num">20</td><td>SERVER</td><td class="num">10.10.20.0/24</td><td class="num">254</td><td class="num">~30 → ~40</td><td>ERP, File, NVR, IP-PBX, NAC บน Server Switch</td></tr>
+      <tr><td class="num">31–35</td><td>STAFF-F1 ถึง F5</td><td class="num">10.10.31.0/24 ถึง 10.10.35.0/24</td><td class="num">254 / ชั้น</td><td class="num">~80 → 104 / ชั้น</td><td>เครื่องพนักงานแบบสาย แยกชั้นละวง ลด Broadcast</td></tr>
+      <tr><td class="num">40</td><td>STAFF-WIFI</td><td class="num">10.10.40.0/22</td><td class="num">1,022</td><td class="num">~500 → ~650</td><td>Laptop/มือถือพนักงาน SSID APJC-Staff ยืนยันตัวตน 802.1X</td></tr>
+      <tr><td class="num">50</td><td>VOICE</td><td class="num">10.10.50.0/24</td><td class="num">254</td><td class="num">120 → 156</td><td>IP Phone, QoS ให้เสียงก่อน (DSCP EF)</td></tr>
+      <tr><td class="num">60</td><td>CCTV-OFFICE</td><td class="num">10.10.60.0/24</td><td class="num">254</td><td class="num">25 → 33</td><td>คุยได้เฉพาะ NVR</td></tr>
+      <tr><td class="num">61</td><td>CCTV-WH</td><td class="num">10.10.61.0/24</td><td class="num">254</td><td class="num">35 → 46</td><td>กล้องคลัง คุยได้เฉพาะ NVR</td></tr>
+      <tr><td class="num">70</td><td>WH-SCANNER</td><td class="num">10.10.70.0/24</td><td class="num">254</td><td class="num">80 → 104</td><td>SSID APJC-WH เข้าได้เฉพาะ ERP</td></tr>
+      <tr><td class="num">71</td><td>WH-STAFF</td><td class="num">10.10.71.0/24</td><td class="num">254</td><td class="num">~25 → ~33</td><td>PC และเครื่องพิมพ์ฉลากในคลัง</td></tr>
+      <tr><td class="num">80</td><td>PRINTER-IOT</td><td class="num">10.10.80.0/24</td><td class="num">254</td><td class="num">~30 → ~40</td><td>เครื่องพิมพ์ เครื่องสแกนเอกสาร ระบบอาคาร</td></tr>
+      <tr><td class="num">90</td><td>GUEST</td><td class="num">172.16.0.0/22</td><td class="num">1,022</td><td class="num">—</td><td>Gateway อยู่บน Firewall เท่านั้น ออก Internet ได้อย่างเดียว ใช้ช่วง IP คนละตระกูลให้แยกชัดเจน</td></tr>
+      <tr><td class="num">999</td><td>PARKING</td><td>ไม่มี IP</td><td>—</td><td>—</td><td>พอร์ตที่ไม่ใช้งานทั้งหมดถูกปิดและอยู่ VLAN นี้</td></tr>
+      <tr><td>—</td><td>TRANSIT</td><td class="num">10.10.255.0/24</td><td>—</td><td>—</td><td>ลิงก์ Core–Distribution–Firewall แบ่งย่อยเป็น /31</td></tr>
+    </tbody>
+  </table></div>
+  <h3 class="sub">สาขา: ชลบุรี 10.21.0.0/16, ขอนแก่น 10.22.0.0/16, เชียงใหม่ 10.23.0.0/16</h3>
+  <p class="body">ตัวอย่างนี้ใช้ชลบุรี (แทน 21 ด้วย 22 หรือ 23 สำหรับสาขาอื่น)</p>
+  <div class="tw"><table>
+    <thead><tr><th>VLAN</th><th>ชื่อ</th><th>Subnet (ชลบุรี)</th><th>ใช้ได้</th><th>ต้องการปีที่ 3</th><th>หมายเหตุ</th></tr></thead>
+    <tbody>
+      <tr><td class="num">10</td><td>MGMT</td><td class="num">10.21.10.0/27</td><td class="num">30</td><td class="num">~6</td><td>Router, Switch, AP</td></tr>
+      <tr><td class="num">30</td><td>STAFF</td><td class="num">10.21.30.0/24</td><td class="num">254</td><td class="num">52</td><td>PC แบบสาย</td></tr>
+      <tr><td class="num">40</td><td>STAFF-WIFI</td><td class="num">10.21.40.0/24</td><td class="num">254</td><td class="num">~100</td><td>Laptop/มือถือ</td></tr>
+      <tr><td class="num">50</td><td>VOICE</td><td class="num">10.21.50.0/26</td><td class="num">62</td><td class="num">~13</td><td>IP Phone (สาขาละ ~10 เครื่อง)</td></tr>
+      <tr><td class="num">60</td><td>CCTV</td><td class="num">10.21.60.0/26</td><td class="num">62</td><td>สำรองไว้</td><td>เผื่อติดกล้องที่สาขาในอนาคต</td></tr>
+      <tr><td class="num">80</td><td>PRINTER</td><td class="num">10.21.80.0/27</td><td class="num">30</td><td class="num">~5</td><td></td></tr>
+      <tr><td class="num">90</td><td>GUEST</td><td class="num">172.16.21.0/24</td><td class="num">254</td><td>—</td><td>ออก Internet ตรงที่สาขา ไม่เข้าอุโมงค์</td></tr>
+    </tbody>
+  </table></div>
+  <h3 class="sub">Cloud DR: 10.100.0.0/16</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Subnet</th><th>ใช้สำหรับ</th></tr></thead>
+    <tbody>
+      <tr><td class="num">10.100.10.0/24</td><td>Management และ Bastion สำหรับทีม IT</td></tr>
+      <tr><td class="num">10.100.20.0/24</td><td>VM ของ ERP (App + Database) และ File Server ชุดสำรอง</td></tr>
+      <tr><td class="num">10.100.255.0/24</td><td>Virtual Firewall / VPN Gateway</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note y">สงวน 10.11.0.0/16 สำหรับขยายอาคาร HQ และ 10.24–10.29 สำหรับสาขาใหม่ ช่วง IP ทุกวงถูกออกแบบให้ใหญ่กว่าความต้องการปีที่ 3 อย่างน้อยเท่าตัว</div>
+</section>
+
+<section class="s" id="branch">
+  <h2>การเชื่อมต่อสาขา: SD-WAN บน Internet 2 ทาง</h2>
+  <p class="lead">ทุกสาขามีอุปกรณ์ SD-WAN Edge (Router + Firewall ในตัว) 1 ตัว ต่อ Internet 2 ทาง และสร้างอุโมงค์เข้ารหัสอัตโนมัติ</p>
+  <div class="cols">
+    <div class="col"><h4>อุโมงค์หลักไป HQ</h4><p>IPsec เข้ารหัส AES-256 วิ่งบน Internet ไปที่ Firewall ของ HQ ซึ่งทำหน้าที่เป็น Hub Firewall อนุญาตให้สาขาเข้าถึงเฉพาะ ERP, File Server และ IP-PBX เท่านั้น</p></div>
+    <div class="col"><h4>Internet 2 ทางต่อสาขา</h4><p>Fiber Broadband เป็นเส้นหลัก และ 4G/5G เป็นเส้นสำรอง SD-WAN วัด Latency/Packet Loss ตลอดเวลา และส่งทราฟฟิกสำคัญ (ERP, เสียง) ไปทางที่ดีที่สุดเอง</p></div>
+    <div class="col"><h4>อุโมงค์สำรองไป Cloud DR</h4><p>ตั้งไว้ล่วงหน้าแต่ไม่ใช้งานในภาวะปกติ เมื่อประกาศเปิด DR สาขาจะวิ่งไป ERP บน Cloud ได้ทันทีโดยไม่ต้องตั้งค่าใหม่ที่หน้างาน</p></div>
+    <div class="col"><h4>Microsoft 365 ออกตรงที่สาขา</h4><p>ทราฟฟิก M365 และ Internet ทั่วไปออกที่สาขาเลย (Local Breakout) ผ่านการกรองของ Edge ไม่ต้องอ้อมมา HQ ทำให้ลิงก์ของ HQ ไม่แน่น</p></div>
+  </div>
+  <div class="note"><b>ทำไมเลือก SD-WAN แทน MPLS?</b> MPLS คุณภาพคงที่แต่ค่าเช่ารายเดือนสูงและใช้เวลาติดตั้งนาน SD-WAN ใช้ Internet ธรรมดาที่ถูกกว่า มีเส้นสำรอง 4G/5G ในตัว เพิ่มสาขาใหม่ได้ในวันเดียว และดูสถานะทุกสาขาได้จากหน้าจอเดียว สำหรับสาขา 30–40 คนที่ใช้ ERP และ M365 เป็นหลัก คุณภาพเพียงพอ</div>
+</section>
+
+<section class="s" id="wifi">
+  <h2>Wi-Fi: สำนักงาน คลัง และแขก</h2>
+  <div class="tw"><table>
+    <thead><tr><th>SSID</th><th>VLAN</th><th>ใครใช้</th><th>ความปลอดภัย</th><th>เข้าถึงได้</th></tr></thead>
+    <tbody>
+      <tr><td>APJC-Staff</td><td class="num">40</td><td>Laptop/มือถือพนักงาน</td><td>WPA3-Enterprise (802.1X) ล็อกอินด้วยบัญชีพนักงาน</td><td>ERP, File, M365, Internet</td></tr>
+      <tr><td>APJC-WH</td><td class="num">70</td><td>Handheld Scanner</td><td>WPA2/WPA3-Enterprise ด้วยใบรับรองเครื่อง, Fast Roaming 802.11r/k/v</td><td>ERP เท่านั้น</td></tr>
+      <tr><td>APJC-Guest</td><td class="num">90</td><td>แขก ผู้ติดต่อ คนขับรถ</td><td>Captive Portal, Client Isolation, จำกัด 10 Mbps/คน</td><td>Internet เท่านั้น</td></tr>
+    </tbody>
+  </table></div>
+  <p class="body">สำนักงานใช้ AP Wi-Fi 6 ประมาณชั้นละ 6 ตัว (รวม 30) คลังใช้ AP แบบติดเพดานสูงหรือเสาอากาศทิศทาง ประมาณ 16 ตัว จำนวนจริงจะยืนยันหลังทำ Site Survey เพราะชั้นวางโลหะและสินค้าที่เปลี่ยนตำแหน่งตลอดส่งผลต่อสัญญาณ ทุก AP ถูกควบคุมด้วย Wireless Controller แบบ HA ที่ปรับช่องสัญญาณและกำลังส่งอัตโนมัติ</p>
+</section>
+
+<section class="s" id="security">
+  <h2>Security พื้นฐาน</h2>
+  <div class="cols">
+    <div class="col"><h4>ตำแหน่ง Firewall</h4><p>Next-Generation Firewall 2 ตัวแบบ HA ตั้งระหว่าง Router ของ ISP ทั้งสองกับ Core Switch ทุกทราฟฟิกเข้า–ออก Internet ต้องผ่านจุดนี้ และเป็นปลายทางอุโมงค์ของสาขาและ Cloud DR ที่สาขามี Firewall ในตัว SD-WAN Edge ส่วน Cloud มี Virtual Firewall</p></div>
+    <div class="col"><h4>Zone บน Firewall</h4><p>OUTSIDE (Internet), INSIDE (VLAN พนักงาน/Server), GUEST, BRANCH-VPN และ CLOUD-DR แต่ละ Zone คุยกันได้เฉพาะที่กฎอนุญาต ค่าเริ่มต้นคือปฏิเสธทั้งหมด</p></div>
+    <div class="col"><h4>การแยกเครือข่ายแขก</h4><p>VLAN 90 ไม่มี Gateway บน Core เลย ทราฟฟิกแขกถูกส่งตรงไป Firewall ซึ่งอนุญาตเฉพาะออก Internet (HTTP/HTTPS/DNS) แขกจึงมองไม่เห็น ERP, กล้อง และเครื่องของพนักงาน รวมถึงมองไม่เห็นเครื่องแขกคนอื่น</p></div>
+    <div class="col"><h4>ภายในเครือข่าย</h4><p>802.1X/NAC ตรวจว่าเครื่องเป็นของบริษัทก่อนให้เข้า VLAN พนักงาน, DHCP Snooping, Dynamic ARP Inspection, BPDU Guard, ปิดพอร์ตที่ไม่ใช้ และเข้าจัดการอุปกรณ์ได้จาก VLAN 10 เท่านั้น</p></div>
+  </div>
+  <h3 class="sub">ทำไมต้องใช้ VLAN</h3>
+  <p class="body">VLAN แบ่ง Switch ตัวเดียวให้เป็นเหมือนหลายเครือข่ายแยกกัน ได้ 3 อย่าง: ความปลอดภัย (กลุ่มหนึ่งถูกเจาะ ไม่ลามไปกลุ่มอื่นเพราะต้องผ่านกฎ ACL/Firewall), ประสิทธิภาพ (Broadcast อยู่ในวงเล็ก ๆ กล้อง 60 ตัวที่ส่งภาพตลอดไม่แย่งแบนด์วิดท์โทรศัพท์) และการจัดการ (ตั้ง QoS ให้เสียง ตั้งกฎให้ Scanner เข้าได้แค่ ERP ตามกลุ่ม ไม่ต้องตามทีละเครื่อง) โดยไม่ต้องซื้อ Switch แยกให้แต่ละกลุ่ม</p>
+</section>
+
+<section class="s" id="dr">
+  <h2>Disaster Recovery บน Cloud</h2>
+  <p class="lead">อุปกรณ์คู่ในห้อง Server ป้องกันการเสียทีละตัว แต่ไม่ป้องกันเหตุที่ทำให้ทั้งห้องหายไป เช่น ไฟไหม้ น้ำท่วม หรือ Ransomware เข้ารหัสทุกเครื่อง DR บน Cloud คือสำเนาที่อยู่นอกอาคาร พร้อมเปิดใช้เมื่อจำเป็น</p>
+  <div class="kpi">
+    <div><b>15 นาที</b><span>RPO ของ ERP: ข้อมูลหายไม่เกินนี้</span></div>
+    <div><b>1 ชั่วโมง</b><span>RPO ของ File Server</span></div>
+    <div><b>4 ชั่วโมง</b><span>RTO: เวลาจนใช้ ERP บน Cloud ได้</span></div>
+    <div><b>2 ครั้ง/ปี</b><span>ซ้อม DR จริง</span></div>
+  </div>
+  <h3 class="sub">รูปแบบ: Warm Standby (Pilot Light)</h3>
+  <p class="body">ฐานข้อมูล ERP ถูก Replicate ไป Cloud ต่อเนื่องทุก 5–15 นาทีผ่านอุโมงค์ IPsec ที่วิ่งจาก Firewall HQ ไป Virtual Firewall บน Cloud, File Server ส่ง Snapshot ทุกชั่วโมง เครื่อง App ของ ERP บน Cloud ถูกปิดไว้หรือเปิดเครื่องเล็กสุด จึงจ่ายค่า Cloud เฉพาะพื้นที่เก็บข้อมูลในภาวะปกติ นอกจากนี้มี Backup รายวันแบบ Immutable (ลบหรือแก้ไม่ได้ 30 วัน) แยกอีกชั้นเพื่อป้องกัน Ransomware ตามหลัก 3-2-1: ข้อมูล 3 ชุด สื่อ 2 แบบ อยู่นอกสถานที่ 1 ชุด</p>
+  <h3 class="sub">ขั้นตอนเมื่อประกาศเปิด DR</h3>
+  <ol class="steps">
+    <li>ผู้บริหารและ IT Manager ประกาศเหตุ เมื่อประเมินว่า HQ ใช้งานไม่ได้เกินเวลาที่ยอมรับได้ (เช่น 2 ชั่วโมง)</li>
+    <li>Promote ฐานข้อมูลสำรองบน Cloud เป็นตัวหลัก และขยายเครื่อง App ของ ERP ให้เต็มขนาด</li>
+    <li>เปลี่ยน DNS ของ erp.apjc และ files.apjc ไปชี้ IP บน Cloud (10.100.20.x)</li>
+    <li>SD-WAN ของทุกสาขาสลับไปใช้อุโมงค์สำรองที่ตั้งไว้แล้วไป Cloud DR อัตโนมัติ</li>
+    <li>พนักงาน HQ ทำงานจากบ้านหรือสาขาผ่าน Client VPN ที่ต่อตรงเข้า Cloud, อีเมลและ Teams ใช้ต่อได้ตามปกติเพราะอยู่บน M365 อยู่แล้ว</li>
+    <li>เมื่อ HQ กลับมา Replicate ข้อมูลย้อนกลับ (Failback) ในช่วงนอกเวลาทำงาน แล้วสลับ DNS กลับ</li>
+  </ol>
+  <div class="note">ลองกด “HQ ล่ม → เปิด DR” และ “Replication ไป Cloud” ในภาพ 3 มิติด้านบนเพื่อดูเส้นทางข้อมูลของแต่ละช่วง</div>
+</section>
+
+<section class="s" id="bom">
+  <h2>รายการอุปกรณ์ (ประเภทและจำนวนโดยประมาณ)</h2>
+  <p class="lead">ไม่ระบุยี่ห้อตามข้อกำหนดของลูกค้า จำนวนเผื่อการขยาย 30% แล้ว และจำนวน AP ในคลังยืนยันหลัง Site Survey</p>
+  <div class="tw"><table>
+    <thead><tr><th>อุปกรณ์</th><th>ที่ตั้ง</th><th>จำนวน</th><th>สเปกสำคัญ / เหตุผล</th></tr></thead>
+    <tbody>
+      <tr><td>Next-Generation Firewall</td><td>HQ ห้อง Server</td><td class="num">2</td><td>HA Active/Standby, IPS, Anti-malware, URL Filter, VPN Hub ≥ 100 อุโมงค์</td></tr>
+      <tr><td>วงจร Internet</td><td>HQ</td><td class="num">2</td><td>ต่าง ISP เข้าอาคารคนละเส้นทาง เช่น 1 Gbps ต่อเส้น</td></tr>
+      <tr><td>Core Switch Layer 3</td><td>HQ ห้อง Server</td><td class="num">2</td><td>พอร์ต 40/100G, MLAG/Stack, Power Supply และพัดลมคู่</td></tr>
+      <tr><td>Distribution Switch L3 – สำนักงาน</td><td>HQ ห้อง Server</td><td class="num">2</td><td>พอร์ต SFP+ 10G ≥ 24, Uplink 40/100G, VRRP</td></tr>
+      <tr><td>Distribution Switch L3 – คลัง</td><td>HQ ห้อง Server</td><td class="num">2</td><td>แยกบล็อกคลัง, Fiber ไปแต่ละโซน</td></tr>
+      <tr><td>Server Switch 10/25G</td><td>HQ ห้อง Server</td><td class="num">2</td><td>Server ทุกเครื่องต่อ 2 เส้นไปคนละตัว</td></tr>
+      <tr><td>Access Switch 48 พอร์ต PoE+ (Uplink 10G)</td><td>ชั้น 1–5</td><td class="num">15</td><td>ชั้นละ 3 ตัวทำ Stack = 144 พอร์ต/ชั้น</td></tr>
+      <tr><td>Access Switch 48 พอร์ต PoE+</td><td>คลังสินค้า</td><td class="num">6</td><td>โซนละ 2 ตัวทำ Stack; Uplink แยกไป Distribution คนละตัว</td></tr>
+      <tr><td>Access Point Wi-Fi 6</td><td>ชั้น 1–5</td><td class="num">30</td><td>ชั้นละ ~6 ตัว</td></tr>
+      <tr><td>Access Point Wi-Fi 6 แบบเพดานสูง</td><td>คลังสินค้า</td><td class="num">16</td><td>Roaming เร็วสำหรับ Scanner</td></tr>
+      <tr><td>Wireless LAN Controller</td><td>HQ (Appliance หรือ VM)</td><td class="num">2</td><td>HA หรือใช้แบบ Cloud-managed แทนได้</td></tr>
+      <tr><td>NVR / Video Management + Storage</td><td>HQ ห้อง Server</td><td class="num">1</td><td>รองรับ ≥ 80 กล้อง เก็บภาพ 30 วัน</td></tr>
+      <tr><td>Virtualization Host + Shared Storage</td><td>HQ ห้อง Server</td><td class="num">2–3</td><td>รัน ERP, File, IP-PBX, NAC/RADIUS, DHCP/DNS, Monitoring</td></tr>
+      <tr><td>UPS แบบ Online</td><td>ห้อง Server / ตู้ชั้น + คลัง</td><td class="num">2 + 6</td><td>N+1 ในห้อง Server, ตู้ละ 1 ที่ชั้นและคลัง</td></tr>
+      <tr><td>SD-WAN Edge (Router + Firewall)</td><td>สาขา</td><td class="num">3</td><td>สาขาละ 1, รองรับ 2 WAN + 4G/5G</td></tr>
+      <tr><td>วงจร Internet สาขา</td><td>สาขา</td><td class="num">3 + 3</td><td>Fiber Broadband + 4G/5G สำรอง ต่อสาขา</td></tr>
+      <tr><td>Access Switch PoE+ 48 + 24 พอร์ต</td><td>สาขา</td><td class="num">3 + 3</td><td>72 พอร์ตต่อสาขา รองรับ 52 คน + โทรศัพท์ + AP</td></tr>
+      <tr><td>Access Point Wi-Fi 6</td><td>สาขา</td><td class="num">9</td><td>สาขาละ 3</td></tr>
+      <tr><td>UPS ขนาดเล็ก</td><td>สาขา</td><td class="num">3</td><td>เลี้ยง Edge, Switch, AP</td></tr>
+      <tr><td>Virtual Firewall / VPN Gateway</td><td>Cloud DR</td><td class="num">1</td><td>ปลายทางอุโมงค์จาก HQ และสาขา</td></tr>
+      <tr><td>VPC/VNet + VM สำรอง + Backup Vault</td><td>Cloud DR</td><td class="num">1 ชุด</td><td>ERP DB Replica, ERP App (ปิดไว้), File, Backup Immutable</td></tr>
+    </tbody>
+  </table></div>
+  <p class="body">สรุป: Switch 34 ตัว (Core 2, Distribution 4, Server 2, Access HQ 18, สาขา 6), Access Point 55 ตัว, Firewall/SD-WAN 5 ตัว + 1 Virtual บน Cloud</p>
+</section>
+
+<section class="s" id="qa">
+  <h2>เตรียมตอบคำถามกรรมการ</h2>
+  <details class="qa"><summary>ทำไมต้องใช้ VLAN ซื้อ Switch แยกไม่ได้หรือ?</summary><p>ได้ แต่ต้องซื้อและดูแล Switch 6–7 ชุดคู่ขนานกันทุกชั้น VLAN ให้ผลเดียวกันบน Switch ชุดเดียว แต่ละกลุ่มแยกขาดจากกันที่ Layer 2 และจะคุยข้ามกลุ่มได้ต้องผ่านกฎ ACL/Firewall ที่เรากำหนด ประหยัดกว่าและยืดหยุ่นกว่า ย้ายโต๊ะก็แค่เปลี่ยน VLAN ของพอร์ต</p></details>
+  <details class="qa"><summary>ถ้า Core เสียจะเกิดอะไรขึ้น?</summary><p>มี Core 2 ตัวทำงานพร้อมกัน ทุก Distribution และ Firewall ต่อสายเข้าทั้ง 2 ตัวรวมเป็นลิงก์เดียว (MLAG) เมื่อตัวหนึ่งเสีย ลิงก์ที่เหลือรับทราฟฟิกทั้งหมดภายในไม่ถึง 1 วินาที ผู้ใช้ไม่รู้สึก ความเสี่ยงเดียวคือช่วงที่รอเปลี่ยนเครื่องเราไม่มีตัวสำรอง จึงต้องมีสัญญา MA แบบเปลี่ยนเครื่องในวันถัดไป (ลองกดสถานการณ์ “Core #1 เสีย”)</p></details>
+  <details class="qa"><summary>ทำไมต้องใช้ PoE?</summary><p>อุปกรณ์กว่า 250 ชิ้น (โทรศัพท์ กล้อง AP) ได้ทั้งข้อมูลและไฟจากสายเส้นเดียว ไม่ต้องเดินปลั๊กไปเพดานคลังสูง ติดตั้งเร็ว ย้ายง่าย และเมื่อไฟดับ UPS ที่ตู้ Switch จะเลี้ยงทุกอย่างต่อ กล้องยังบันทึกได้ โทรศัพท์ยังโทรได้</p></details>
+  <details class="qa"><summary>ถ้า Internet ทั้ง 2 ISP ล่มพร้อมกันล่ะ?</summary><p>โอกาสต่ำเพราะเลือกคนละผู้ให้บริการและคนละเส้นทางเข้าอาคาร ถ้าเกิดขึ้น ระบบภายใน HQ ทั้ง ERP, File, โทรศัพท์ภายใน และกล้องยังทำงาน สิ่งที่หยุดคือ M365 และการเชื่อมสาขา ถ้ายืดเยื้อ ผู้บริหารเลือกเปิด DR เพื่อให้สาขากลับมาใช้ ERP ผ่าน Cloud ได้</p></details>
+  <details class="qa"><summary>แขกต่อ Wi-Fi แล้วเข้ามาเจาะ ERP ได้ไหม?</summary><p>ไม่ได้ VLAN แขกไม่มีเส้นทางไปเครือข่ายภายในเลย Gateway อยู่บน Firewall ซึ่งอนุญาตเฉพาะออก Internet และเปิด Client Isolation ทำให้แขกมองไม่เห็นกันเอง (กดสถานการณ์ “เส้นทาง Wi-Fi แขก”)</p></details>
+  <details class="qa"><summary>ทำไมทำ DR บน Cloud แทนการสร้างห้อง Server สำรองอีกแห่ง?</summary><p>ห้อง Server สำรองต้องลงทุนอุปกรณ์ซ้ำเกือบทั้งชุด ค่าพื้นที่ ไฟ แอร์ และคนดูแล Cloud จ่ายเฉพาะพื้นที่เก็บข้อมูลในภาวะปกติ และจ่ายค่าเครื่องเต็มเฉพาะตอนซ้อมหรือเกิดเหตุจริง อีกทั้งอยู่ห่างจาก HQ คนละภูมิภาค ไม่เจอภัยเดียวกัน</p></details>
+  <details class="qa"><summary>Scanner หลุดบ่อยในคลังจะแก้อย่างไร?</summary><p>ทำ Site Survey ก่อนและหลังติดตั้ง ใช้ AP แบบเสาอากาศทิศทางยิงลงระหว่างชั้นวาง เปิด 802.11r/k/v ให้ Scanner ย้าย AP ได้ใน &lt; 50 มิลลิวินาที และให้ Controller ปรับช่องสัญญาณอัตโนมัติเมื่อสินค้าบนชั้นเปลี่ยน</p></details>
+  <details class="qa"><summary>รองรับคนเพิ่ม 30% ได้จริงหรือ?</summary><p>พอร์ตต่อชั้น 144 รองรับ ~104 คน + AP + กล้อง + เครื่องพิมพ์ ยังเหลือ, VLAN พนักงาน /24 ต่อชั้น (254) และ Wi-Fi /22 (1,022), PoE ใช้ราวครึ่งของงบ ถ้าเกินกว่านั้นเพิ่ม Switch เข้า Stack ได้ทันทีโดยไม่กระทบชั้นอื่น</p></details>
+</section>
+
+<section class="s" id="agenda">
+  <h2>ลำดับนำเสนอ 30 นาที + Q&amp;A 5 นาที</h2>
+  <ol class="steps">
+    <li><b>0:00–3:00</b> ปัญหาและเป้าหมายธุรกิจของ APJC (ย้ายอาคาร, คลังห้ามหยุด, 3 สาขา)</li>
+    <li><b>3:00–8:00</b> เดินชม Topology ในมุมมองอาคารจริง: ห้อง Server ชั้น 2, ตู้ Switch แต่ละชั้น, คลัง, สาขา, Cloud</li>
+    <li><b>8:00–12:00</b> สลับเป็นมุมมองแบ่งชั้น อธิบาย Core / Distribution / Access และ PoE</li>
+    <li><b>12:00–16:00</b> VLAN / IP Plan และเหตุผลที่ต้องแยกเครือข่าย</li>
+    <li><b>16:00–20:00</b> สาธิตสถานการณ์ Core เสีย, Firewall เสีย, ISP ล่ม</li>
+    <li><b>20:00–23:00</b> สาขาเชื่อม ERP ผ่าน SD-WAN และ Security พื้นฐาน (เส้นทาง Wi-Fi แขก)</li>
+    <li><b>23:00–26:00</b> DR บน Cloud: Replication และสาธิต HQ ล่ม</li>
+    <li><b>26:00–30:00</b> รายการอุปกรณ์ และสรุปประโยชน์ทางธุรกิจตามความต้องการทีละข้อ</li>
+  </ol>
+</section>
+</main>
+<footer>แบบเครือข่ายเสนอสำหรับ APJC Logistics ตัวเลขจำนวนเป็นค่าประมาณเพื่อการออกแบบ ยืนยันหลังสำรวจหน้างาน</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+const stage=document.getElementById('stage');
+const canvas=document.getElementById('c');
+const labelsEl=document.getElementById('labels');
+const panel=document.getElementById('panel');
+if(typeof THREE==='undefined'){panel.innerHTML='<h3>โหลดภาพ 3 มิติไม่สำเร็จ</h3><p>ตรวจสอบการเชื่อมต่อ Internet แล้วรีเฟรชหน้า เนื้อหาด้านล่างยังอ่านได้ครบ</p>';return;}
+
+const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const H=3.2, fy=k=>(k-1)*H;
+
+/* ---------- nodes ---------- */
+const NODES=[]; const N={};
+function add(id,type,label,phys,log,info,opt){const n=Object.assign({id,type,label,phys,log,info,major:false},opt||{});NODES.push(n);N[id]=n;}
+
+add('INTERNET','cloud','Internet',[-14,21,-9],[0,30,-2],{t:'Internet',layer:'Cloud / WAN',qty:'—',role:'เครือข่ายสาธารณะที่เชื่อม HQ สาขา Microsoft 365 และ Cloud DR เข้าด้วยกัน',why:'ใช้เป็นถนน (Underlay) ให้ SD-WAN สร้างอุโมงค์เข้ารหัสระหว่างสาขา–HQ–Cloud แทนการเช่าวงจร MPLS ที่แพงกว่า'},{major:true});
+add('M365','cloud','Microsoft 365 / SaaS',[-30,24,-16],[-14,31,-9],{t:'Microsoft 365 และระบบ Cloud',layer:'Cloud',qty:'บริการ',role:'อีเมล Teams OneDrive SharePoint และระบบ SaaS อื่น',why:'ผู้ใช้ทั้ง HQ และสาขาออก Internet ไปหาได้ตรง ไม่ต้องอ้อมผ่าน HQ และยังใช้งานได้แม้สำนักงานใหญ่ล่ม จึงเป็นส่วนหนึ่งของแผนต่อเนื่องทางธุรกิจ'},{major:true});
+add('CLOUD-DR','dr','Cloud DR Region',[25,26,-16],[26,30,-8],{t:'Cloud DR Region / VPC',layer:'Disaster Recovery',qty:'VPC/VNet 10.100.0.0/16 ข้าม 2 Availability Zones; Transit 10.100.10.0/24; App 10.100.20.0/23; Data 10.100.30.0/23; Management/Logs 10.100.40.0/24',role:'ขอบเขตเครือข่ายของระบบ DR; แยก Public/Transit, Private App, Private Data และ Management/Logs ด้วย Route Table และ Security Policy',why:'Database ไม่มี Public IP และรับการเชื่อมต่อจาก App subnet เท่านั้น; App รับทราฟฟิกผ่าน Firewall/Load Balancer; ใช้ IAM แบบ least privilege, MFA, KMS/Secrets และส่ง Audit/Flow Logs ไปเก็บแยก'},{major:true});
+const cloudItem=(id,type,label,phys,log,t,qty,role,why)=>add(id,type,label,phys,log,{t,layer:'Cloud DR / 10.100.0.0/16',qty,role,why},{major:true});
+cloudItem('CLOUD-VPN','vpn','VPN Gateway',[8,25,-17],[9,31,-8],'Cloud VPN Gateway (HA)','Managed VPN Gateway 2 tunnels','รับ IPsec จาก HQ และสาขา ส่งเข้าเครือข่าย DR ผ่านเส้นทางส่วนตัว','มี tunnel สำรองจาก HQ และสาขา; ตรวจสอบการทำงานข้าม Availability Zone และทดสอบ failover');
+cloudItem('CLOUD-FW1','vfw','Cloud Firewall A',[11,25,-17],[12,31,-8],'Virtual Firewall A','Managed firewall pair','ตรวจและควบคุมทราฟฟิกเข้า–ออก VPC ตาม Security Policy','ทำงานเป็นคู่ข้าม Availability Zone; Security Group/Network ACL เป็นชั้นเสริม ไม่ใช้แทน Firewall Policy');
+cloudItem('CLOUD-FW2','vfw','Cloud Firewall B',[11,24,-11],[14,31,-8],'Virtual Firewall B','Managed firewall pair','โหนดสำรองของ Cloud Firewall','รับงานเมื่อโหนด A หรือ Availability Zone มีปัญหา; ต้องซิงค์ policy และ log');
+cloudItem('CLOUD-LB','lb','Load Balancer',[14,25,-17],[17,31,-8],'Internal Load Balancer','Managed service, multi-AZ','ตรวจสุขภาพและกระจายคำขอไปยัง ERP App ที่พร้อมให้บริการ','กระจายข้าม Availability Zone และนำ App ที่ไม่พร้อมออกจาก pool อัตโนมัติ');
+cloudItem('CLOUD-APP1','vm','ERP App VM A',[17,26,-17],[20,31,-8],'ERP Application VM A','Warm standby; start/scale on DR declaration','ชั้น Application สำหรับ ERP เชื่อมต่อฐานข้อมูลสำรอง','เตรียม image/configuration และสิทธิ์ไว้; เปิดหรือขยายเมื่อประกาศ DR');
+cloudItem('CLOUD-APP2','vm','ERP App VM B',[17,24,-11],[23,31,-8],'ERP Application VM B','Warm standby; second Availability Zone','โหนด App สำรองเพื่อรองรับการเปิด DR แบบหลาย AZ','เปิดพร้อม VM A เมื่อโหลดต้องการ และอยู่หลัง Load Balancer');
+cloudItem('CLOUD-DB','db','ERP DB Replica',[14,24,-11],[20,29,-8],'ERP Database Replica','Asynchronous replication; RPO target ≤ 15 min','ฐานข้อมูลสำรองของ ERP; Promote เป็น Primary เมื่อประกาศ DR','Replication จาก HQ ทุก 5–15 นาที; ทำ snapshot ก่อน Promote และตรวจ consistency');
+cloudItem('CLOUD-FILE','storage','File Replica',[8,24,-11],[9,29,-8],'File Service Replica','Snapshot/object replication; RPO target ≤ 1 hr','สำเนาข้อมูล File Server ให้ผู้ใช้เข้าถึงเมื่อเปิด DR','เก็บ version และทดสอบ restore; แยกสิทธิ์ผู้ดูแลจาก production');
+cloudItem('CLOUD-VAULT','vault','Immutable Vault',[20,24,-11],[14,29,-8],'Immutable Backup Vault','Object lock / immutable retention','เก็บ Backup แยกจากระบบใช้งานจริงสำหรับกู้จาก Ransomware','ล็อก retention, เปิด versioning และแยกบัญชี/สิทธิ์ลบจากผู้ดูแลระบบ');
+cloudItem('CLOUD-DNS','dns','DNS / Health Check',[20,24,-14],[17,29,-8],'DNS Failover / Health Check','Public DNS health check','ตรวจบริการ ERP และเปลี่ยน DNS ไป Cloud endpoint เมื่ออนุมัติเปิด DR','ลด TTL ล่วงหน้าและทดสอบ cache/การเปลี่ยนปลายทางระหว่างซ้อม DR');
+
+add('ISP-A','isp','ISP A',[-15,0.4,-3],[-5,24.5,0],{t:'Internet ISP A (เส้นหลัก)',layer:'Edge',qty:'1 วงจร เช่น 1 Gbps + Router ของผู้ให้บริการ',role:'ทางออก Internet หลักของ HQ',why:'ใช้ ISP 2 รายคนละเส้นทางเข้าอาคาร ถ้ารายหนึ่งล่ม (สายขาด ชุมสายเสีย) อีกรายรับงานต่อทันที ตอบข้อ “Internet ต้องไม่หยุด”'},{major:true});
+add('ISP-B','isp','ISP B',[-2,0.4,-11],[5,24.5,0],{t:'Internet ISP B (เส้นสำรอง/แบ่งโหลด)',layer:'Edge',qty:'1 วงจร ต่างผู้ให้บริการ',role:'ทางออก Internet ที่สองของ HQ ใช้แบ่งโหลดในภาวะปกติ',why:'เข้าอาคารจากอีกด้านหนึ่ง (Diverse Path) ป้องกันกรณีรถขุดถนนตัดสายเส้นเดียวแล้วล่มทั้งคู่'},{major:true});
+
+const fwInfo=k=>({t:'Next-Generation Firewall #'+k+(k===1?' (Active)':' (Standby)'),layer:'Security / Edge',qty:'รวม 2 ตัว ทำ HA Active/Standby',role:'ด่านระหว่าง Internet กับเครือข่ายภายใน: IPS, Anti-malware, URL Filtering, Application Control, เป็น Hub ของอุโมงค์ SD-WAN จากสาขาและ Cloud DR และเป็น Gateway เดียวของ VLAN แขก',why:'สองตัวซิงค์ Session ตลอด ถ้าตัว Active เสีย ตัว Standby รับ IP เดิมภายใน 1–3 วินาที การเชื่อมต่อที่ค้างอยู่ไม่หลุด'});
+add('FW1','fw','Firewall 1',[-8.5,5.6,-3.5],[-3.5,19.5,0],fwInfo(1),{major:true});
+add('FW2','fw','Firewall 2',[-6.8,5.6,-3.5],[3.5,19.5,0],fwInfo(2),{major:true});
+const coreInfo=k=>({t:'Core Switch Layer 3 #'+k,layer:'Core Layer',qty:'รวม 2 ตัว (MLAG/Stack)',role:'กระดูกสันหลังของเครือข่าย ส่งข้อมูลความเร็วสูง 40/100G ระหว่างบล็อกสำนักงาน บล็อกคลัง บล็อก Server และ Firewall ไม่ต่ออุปกรณ์ผู้ใช้ตรง',why:'ทุกอุปกรณ์ชั้นล่างต่อเข้า Core ทั้ง 2 ตัว ถ้าตัวหนึ่งเสีย อีกตัวรับทราฟฟิกทั้งหมดในไม่ถึง 1 วินาที มี Power Supply และพัดลมคู่ ตั้งอยู่ในห้อง Server ชั้น 2'});
+add('CORE1','core','Core 1',[-8.5,5.0,-3.5],[-3.5,14.5,0],coreInfo(1),{major:true});
+add('CORE2','core','Core 2',[-6.8,5.0,-3.5],[3.5,14.5,0],coreInfo(2),{major:true});
+const dsoInfo=k=>({t:'Distribution Switch สำนักงาน #'+k,layer:'Distribution Layer',qty:'รวม 2 ตัว',role:'รวม Uplink จาก Access Switch ชั้น 1–5 เป็น Default Gateway ของ VLAN สำนักงาน (VRRP สำรองกัน) และบังคับใช้ ACL ระหว่าง VLAN',why:'แบ่งเครือข่ายเป็นบล็อก ปัญหาในบล็อกสำนักงานไม่ลามไปคลัง และเพิ่มชั้นหรือ Switch ใหม่ได้โดยไม่ต้องแตะ Core'});
+add('DS-OFF1','dist','Dist สำนักงาน 1',[-8.5,4.4,-3.5],[-14,9.5,0],dsoInfo(1),{major:true});
+add('DS-OFF2','dist','Dist สำนักงาน 2',[-6.8,4.4,-3.5],[-8.5,9.5,0],dsoInfo(2),{major:true});
+const dswInfo=k=>({t:'Distribution Switch คลังสินค้า #'+k,layer:'Distribution Layer',qty:'รวม 2 ตัว',role:'รวม Uplink Fiber จาก Access Switch 3 โซนในคลัง เป็น Gateway ของ VLAN 61, 70, 71',why:'งานยิงบาร์โค้ดคือหัวใจของธุรกิจ จึงแยกบล็อกคลังออกมาให้ปัญหาหรือการบำรุงรักษาฝั่งสำนักงานไม่กระทบการรับ–จ่ายสินค้า'});
+add('DS-WH1','dist','Dist คลัง 1',[-8.5,3.8,-3.5],[8.5,9.5,0],dswInfo(1),{major:true});
+add('DS-WH2','dist','Dist คลัง 2',[-6.8,3.8,-3.5],[14,9.5,0],dswInfo(2),{major:true});
+const dcInfo=k=>({t:'Server Switch #'+k,layer:'Distribution (Server Block)',qty:'รวม 2 ตัว พอร์ต 10/25G',role:'เชื่อม Server ERP, File, NVR และ VM บริการพื้นฐาน',why:'Server แต่ละเครื่องต่อสาย 2 เส้นไปคนละ Switch (NIC Teaming) ถ้า Switch หรือสายเส้นใดเสีย Server ยังให้บริการได้'});
+add('DC1','dcsw','Server SW 1',[-5.1,5.6,-3.5],[-2.8,9.5,-7],dcInfo(1),{major:true});
+add('DC2','dcsw','Server SW 2',[-5.1,5.0,-3.5],[2.8,9.5,-7],dcInfo(2),{major:true});
+
+add('SRV-ERP','server','ERP',[-3.4,5.3,-3.5],[-6,4.5,-11],{t:'ERP Server',layer:'Server (VLAN 20)',qty:'VM บน Virtualization Cluster 2–3 โฮสต์ + Shared Storage',role:'ระบบ ERP หลักของบริษัท ใช้ทั้ง HQ คลัง และสาขา',why:'เข้าถึงได้เฉพาะกลุ่มที่อนุญาต (พนักงาน, Scanner, สาขาผ่าน VPN) ฐานข้อมูล Replicate ไป Cloud DR ทุก 5–15 นาที'},{major:true});
+add('SRV-FILE','server','File Server',[-3.4,4.2,-3.5],[-2,4.5,-11],{t:'File Server',layer:'Server (VLAN 20)',qty:'VM',role:'แชร์ไฟล์ของแผนกต่าง ๆ',why:'Snapshot ทุกชั่วโมงและส่งไป Cloud DR, Backup รายวันแบบ Immutable ป้องกัน Ransomware'},{major:true});
+add('NVR','server','NVR (CCTV)',[-1.7,5.3,-3.5],[2,4.5,-11],{t:'NVR / Video Management',layer:'Server',qty:'1 เครื่อง + Storage รองรับ ≥ 80 กล้อง เก็บ 30 วัน',role:'บันทึกและดูภาพกล้อง 60 ตัว',why:'กล้องอยู่ VLAN 60/61 ที่คุยได้เฉพาะ NVR ป้องกันการเจาะกล้องแล้วลามเข้าระบบอื่น'},{major:true});
+add('SRV-APP','server','Infra Services',[-1.7,4.2,-3.5],[6,4.5,-11],{t:'บริการพื้นฐานของเครือข่าย',layer:'Server',qty:'VM: IP-PBX, Wireless Controller (HA), NAC/RADIUS, DHCP/DNS, Monitoring/Syslog',role:'ควบคุมโทรศัพท์ 150 เครื่อง, AP ทุกตัว, ยืนยันตัวตน 802.1X และเฝ้าระวังเครือข่าย',why:'รวมบริการไว้ที่เดียวทำให้จัดการง่าย Monitoring แจ้งเตือนทีม IT ก่อนผู้ใช้จะรู้ตัว'},{major:true});
+
+for(let k=1;k<=5;k++){
+  const xL=-21+(k-1)*3.5, b=fy(k);
+  add('AS-F'+k,'access','Access ชั้น '+k,[-8.5,b+1.3,4.2],[xL,4,3],{t:'Access Switch ชั้น '+k,layer:'Access Layer',qty:'3 × 48 พอร์ต PoE+ ต่อเป็น Stack (144 พอร์ต)',role:'จุดเสียบของคอมพิวเตอร์ IP Phone AP กล้อง และเครื่องพิมพ์ในชั้น กำหนด VLAN ให้แต่ละพอร์ตและจ่ายไฟผ่านสาย LAN (PoE)',why:'Uplink Fiber 10G สองเส้นไป Distribution คนละตัว รองรับ ~104 คน (+30%) ยังมีพอร์ตเหลือ'+(k===2?' ชั้นนี้มีห้อง Server ด้วย':'')},{major:true});
+  add('AP-F'+k,'ap','AP ชั้น '+k,[2,b+2.95,0],[xL-1.2,-0.5,4.6],{t:'Access Point ชั้น '+k,layer:'Access / Wireless',qty:'~6 ตัว Wi-Fi 6 ต่อชั้น (รวม 30)',role:'ปล่อย SSID: APJC-Staff (VLAN 40), APJC-Guest (VLAN 90)',why:'รับไฟ PoE จาก Switch ไม่ต้องเดินปลั๊กบนฝ้า และกระจายต่อคนละ Switch ใน Stack ถ้า Switch ตัวหนึ่งเสีย Wi-Fi ยังครอบคลุม'});
+  add('EP-F'+k,'ep','ผู้ใช้ชั้น '+k,[5,b+0.45,2.6],[xL+1.2,-0.5,4.6],{t:'อุปกรณ์ปลายทางชั้น '+k,layer:'Endpoint',qty:'~80 PC/Laptop, ~24 IP Phone, ~5 กล้อง, เครื่องพิมพ์',role:'อุปกรณ์ที่พนักงานใช้งาน',why:'IP Phone มีพอร์ตต่อ PC ในตัว สายเดียวใช้ทั้งโทรศัพท์และคอม (คนละ VLAN) ประหยัดพอร์ตและสาย'});
+}
+add('GUEST','guest','แขก',[8.5,0.5,4.5],[-21,-4.5,7.5],{t:'อุปกรณ์ของแขก',layer:'Guest (VLAN 90)',qty:'—',role:'ต่อ SSID APJC-Guest ที่ล็อบบี้หรือห้องประชุม',why:'Gateway ของ VLAN 90 อยู่บน Firewall เท่านั้น ออกได้แค่ Internet ผ่าน Captive Portal จำกัดแบนด์วิดท์ และมองไม่เห็นกันเอง'});
+const whz=[-6,0,6];
+for(let k=1;k<=3;k++){
+  const xL=8+(k-1)*3.5;
+  add('AS-WH'+k,'access','Access คลัง '+k,[13.6,1.3,whz[k-1]],[xL,4,3],{t:'Access Switch Stack คลัง โซน '+k,layer:'Access Layer',qty:'2 × 48 พอร์ต PoE+ ทำ Stack (รวม 6 ตัวใน 3 โซน)',role:'จ่ายไฟและเชื่อม AP, กล้อง 35 ตัว, PC และเครื่องพิมพ์ฉลากในคลัง',why:'แต่ละโซนมี Switch 2 ตัวใน Stack และ Fiber 10G สองเส้นไป Distribution คนละตัว รองรับความเสียหายของ Switch หรือลิงก์หนึ่งเส้น'},{major:true});
+  add('AP-WH'+k,'ap','AP คลัง '+k,[19+(k-1)*6,8.6,k===2?3:-4],[xL-1.2,-0.5,4.6],{t:'Access Point คลัง โซน '+k,layer:'Access / Wireless',qty:'~5–6 ตัวต่อโซน (รวม 16) แบบเพดานสูง',role:'ปล่อย SSID APJC-WH (VLAN 70) ให้ Scanner',why:'เปิด Fast Roaming 802.11r/k/v ให้ Scanner ที่เคลื่อนที่ตลอดไม่หลุด ต้องทำ Site Survey เพราะชั้นวางโลหะสะท้อนสัญญาณ'});
+}
+add('EP-WH','scan','Scanner 80 เครื่อง',[24,0.5,-1],[11.5,-4.5,7.5],{t:'Handheld Scanner 80 เครื่อง (+ กล้องคลัง 35 ตัว)',layer:'Endpoint (VLAN 70)',qty:'80 → 104 เครื่องในปีที่ 3',role:'ยิงบาร์โค้ดรับ–จ่ายสินค้าเข้าระบบ ERP',why:'อยู่ VLAN 70 เข้าถึงได้เฉพาะ ERP เท่านั้น ใช้คลื่น 5 GHz เป็นหลัก'},{major:true});
+const brs=[['BR-CBI','สาขาชลบุรี',21],['BR-KKN','สาขาขอนแก่น',22],['BR-CNX','สาขาเชียงใหม่',23]];
+brs.forEach(([id,name,o],i)=>{
+  add(id,'branch',name,[-38,0,-14+i*14],[-33,17,-10+i*10],{t:name+' (10.'+o+'.0.0/16)',layer:'Branch',qty:'SD-WAN Edge 1, Switch PoE+ 48 + 24 พอร์ต, AP 3, UPS 1, Internet Fiber + 4G/5G',role:'สาขา 30–40 คน (รองรับ 52 คน)',why:'สร้างอุโมงค์ IPsec เข้ารหัสไป HQ (หลัก) และ Cloud DR (สำรอง) อัตโนมัติ ถ้า Fiber ล่มสลับไป 4G/5G เอง ทราฟฟิก M365 ออกตรงที่สาขา'},{major:true});
+  add(id+'-EP','endpoint','Endpoint '+name,[-29,0.7,-14+i*14],[-24,15,-10+i*10],{t:'Endpoint '+name,layer:'Branch Endpoint',qty:'PC/Laptop, IP Phone, Printer และ AP ของพนักงาน 30–40 คน',role:'อุปกรณ์ผู้ใช้และโทรศัพท์ที่เชื่อมผ่าน LAN/Wi-Fi ของสาขา',why:'แสดงกลุ่ม Endpoint ของสาขา; เครือข่ายสำรองผ่าน 4G/5G ยังขึ้นกับ SD-WAN Edge ของสาขา'});
+});
+
+/* ---------- links ---------- */
+const LINKS=[];
+const link=(a,b,type)=>LINKS.push({a,b,type,key:a+'|'+b});
+['ISP-A','ISP-B'].forEach(i=>link(i,'INTERNET','wan'));
+link('M365','INTERNET','wan');
+['ISP-A','ISP-B'].forEach(i=>['FW1','FW2'].forEach(f=>link(i,f,'edge')));
+link('FW1','FW2','ha');
+['FW1','FW2'].forEach(f=>['CORE1','CORE2'].forEach(c=>link(f,c,'fiber100')));
+link('CORE1','CORE2','ha');
+['DS-OFF','DS-WH','DC'].forEach(p=>{['1','2'].forEach(n=>['CORE1','CORE2'].forEach(c=>link(c,p+n,'fiber100')));link(p+'1',p+'2','ha');});
+for(let k=1;k<=5;k++){link('AS-F'+k,'DS-OFF1','fiber');link('AS-F'+k,'DS-OFF2','fiber');link('AS-F'+k,'AP-F'+k,'poe');link('AS-F'+k,'EP-F'+k,'poe');}
+link('GUEST','AP-F1','wifi');
+for(let k=1;k<=3;k++){link('AS-WH'+k,'DS-WH1','fiber');link('AS-WH'+k,'DS-WH2','fiber');link('AS-WH'+k,'AP-WH'+k,'poe');link('EP-WH','AP-WH'+k,'wifi');}
+['SRV-ERP','SRV-FILE','NVR','SRV-APP'].forEach(s=>['DC1','DC2'].forEach(d=>link(d,s,'srv')));
+brs.forEach(([id])=>{link(id,'INTERNET','wan');link(id,'FW1','vpn');link(id,'CLOUD-VPN','vpnb');link(id,id+'-EP','poe');});
+link('FW1','CLOUD-VPN','repl');
+link('CLOUD-VPN','CLOUD-FW1','vpn');link('CLOUD-FW1','CLOUD-FW2','ha');link('CLOUD-FW1','CLOUD-LB','cloud');
+link('CLOUD-LB','CLOUD-APP1','cloud');link('CLOUD-LB','CLOUD-APP2','cloud');
+link('CLOUD-APP1','CLOUD-DB','srv');link('CLOUD-APP2','CLOUD-DB','srv');
+link('CLOUD-FW1','CLOUD-FILE','cloud');link('CLOUD-DB','CLOUD-VAULT','repl');link('CLOUD-FILE','CLOUD-VAULT','repl');link('CLOUD-DNS','CLOUD-LB','cloud');
+
+const CURVED={wan:0.16,vpn:0.28,vpnb:0.32,repl:0.3,cloud:0.12};
+const DASHED={ha:1,wifi:1,vpn:1,vpnb:1,repl:1};
+const PAL_LIGHT={fiber100:'#4f5bd5',fiber:'#0d97a6',poe:'#5f8a3f',ha:'#c79100',wifi:'#c98a00',wan:'#d9601a',edge:'#d9601a',srv:'#0f8f80',vpn:'#7d3fd8',vpnb:'#9c6ae0',repl:'#13914f',cloud:'#4778b8',down:'#d23b3b'};
+const PAL_DARK={fiber100:'#8892ff',fiber:'#2bd0df',poe:'#9ccc6e',ha:'#f2c230',wifi:'#f5b82e',wan:'#ff8a42',edge:'#ff8a42',srv:'#3ad6c0',vpn:'#b58bff',vpnb:'#cfb2ff',repl:'#43d98c',cloud:'#78aef0',down:'#ff6262'};
+let PAL=PAL_LIGHT;
+
+/* ---------- three setup ---------- */
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(42,1,0.1,1000);
+scene.add(new THREE.HemisphereLight(0xffffff,0x52606e,0.95));
+const dl=new THREE.DirectionalLight(0xffffff,0.75);dl.position.set(25,45,35);scene.add(dl);
+
+const hitMeshes=[];
+function M(color,opts){const m=new THREE.MeshStandardMaterial(Object.assign({color,roughness:.5,metalness:.12,transparent:true,opacity:1},opts||{}));m.userData.base=new THREE.Color(color);m.userData.baseOp0=m.opacity;return m;}
+function box(w,h,d,m){return new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);}
+function cyl(r,h,m,seg){return new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,seg||24),m);}
+
+function buildNode(n){
+  const g=new THREE.Group(); const mats=[]; const mk=(c,o)=>{const m=M(c,o);mats.push(m);return m;};
+  function rackUnit(color,ports=8,w=1.4,parent=g){
+    const shell=mk(color),face=mk('#263443'),port=mk('#9fe6ff'),led=mk('#61d394');
+    const body=box(w,.36,.82,shell);parent.add(body);
+    const front=box(w*.94,.26,.035,face);front.position.set(0,0,.43);parent.add(front);
+    for(let i=0;i<ports;i++){const x=-w*.39+i*(w*.78/Math.max(ports-1,1));const p=box(.075,.105,.035,port);p.position.set(x,-.025,.46);parent.add(p);}
+    [-.48,-.38].forEach(x=>{const l=cyl(.025,.025,led,8);l.rotation.x=Math.PI/2;l.position.set(x,.1,.46);parent.add(l);});
+    return body;
+  }
+  let hitR=0.9, lblY=0.7;
+  switch(n.type){
+    case 'cloud':{const m=mk(n.id==='M365'?'#6aa8f5':'#d8e0ea');[[0,0,0,1.6],[1.5,-.35,0,1.15],[-1.5,-.35,0,1.15],[.65,.75,.2,1.1],[-.65,.65,-.2,1]].forEach(([x,y,z,r])=>{const s=new THREE.Mesh(new THREE.SphereGeometry(r,22,16),m);s.position.set(x,y,z);g.add(s);});hitR=2.4;lblY=2.4;break;}
+    case 'dr':{const m=mk('#75a7dc',{opacity:.9});[[0,0,0,1.25],[1.1,-.25,0,.9],[-1.1,-.25,0,.9],[.45,.55,0,.8],[-.5,.45,0,.72]].forEach(([x,y,z,r])=>{const s=new THREE.Mesh(new THREE.SphereGeometry(r,20,14),m);s.position.set(x,y,z);g.add(s);});const tag=box(1.45,.42,.12,mk('#eaf3ff'));tag.position.y=-.78;g.add(tag);hitR=2;lblY=1.6;break;}
+    case 'isp':{g.add(cyl(.55,.55,mk('#e8722c')));const a=cyl(.05,.9,mk('#7a8794'));a.position.set(.3,.7,0);g.add(a);break;}
+    case 'fw':{rackUnit('#d94141',8,1.5);const shield=new THREE.Mesh(new THREE.OctahedronGeometry(.16),mk('#ffd8d8'));shield.position.set(-.57,.28,.1);g.add(shield);break;}
+    case 'core':{rackUnit('#5b63e6',12,1.55);const badge=box(.24,.12,.035,mk('#e6e9ff'));badge.position.set(-.55,.2,.43);g.add(badge);break;}
+    case 'dist':{rackUnit('#2f7fe8',10,1.45);break;}
+    case 'dcsw':{rackUnit('#14a89a',12,1.5);break;}
+    case 'server':{const shell=mk('#465564'),face=mk('#202a34'),led=mk('#67df9d');g.add(box(1.1,1.35,.9,shell));const front=box(.9,1.2,.04,face);front.position.set(0,0,.48);g.add(front);[-.42,-.14,.14,.42].forEach(y=>{const u=box(.72,.22,.05,mk('#697887'));u.position.set(0,y,.51);g.add(u);const l=cyl(.025,.025,led,8);l.rotation.x=Math.PI/2;l.position.set(-.32,y,.55);g.add(l);});hitR=1.1;lblY=1.05;break;}
+    case 'access':{[-.23,0,.23].forEach(y=>{const unit=new THREE.Group();unit.position.y=y;g.add(unit);rackUnit('#119fd6',8,1.25,unit);});lblY=.75;break;}
+    case 'ap':{g.add(cyl(.45,.14,mk('#f0f2f5'),28));const d=new THREE.Mesh(new THREE.SphereGeometry(.13,12,10),mk('#f2a900'));d.position.y=-.08;g.add(d);hitR=.7;lblY=.55;break;}
+    case 'ep':case 'endpoint':{const metal=mk('#7e8fa1'),screen=mk('#263a4f'),glow=mk('#73d6ff');
+      const mon=box(.68,.45,.06,metal);mon.position.set(-.48,.42,0);g.add(mon);const display=box(.57,.34,.025,screen);display.position.set(-.48,.43,.045);g.add(display);const stand=box(.08,.2,.08,metal);stand.position.set(-.48,.1,0);g.add(stand);
+      const laptop=box(.5,.06,.36,metal);laptop.position.set(.25,.08,0);g.add(laptop);const lid=box(.5,.34,.035,screen);lid.position.set(.25,.28,-.16);lid.rotation.x=-.15;g.add(lid);
+      const phone=box(.28,.14,.32,mk('#313e4a'));phone.position.set(.83,.08,.1);g.add(phone);const printer=box(.36,.26,.3,mk('#d9e1e9'));printer.position.set(.86,.32,-.42);g.add(printer);
+      const cam=cyl(.11,.32,mk('#d9dee4'),12);cam.rotation.z=Math.PI/2;cam.position.set(-1.04,.5,0);g.add(cam);const lens=cyl(.06,.08,glow,12);lens.rotation.z=Math.PI/2;lens.position.set(-1.23,.5,0);g.add(lens);
+      const ap=cyl(.2,.1,mk('#f0f2f5'),20);ap.position.set(1.35,.66,-.35);g.add(ap);hitR=1.55;lblY=1.05;break;}
+    case 'guest':{const body=box(.34,.62,.1,mk('#303d4a'));g.add(body);const screen=box(.27,.43,.025,mk('#76c9f4'));screen.position.set(0,.04,.065);g.add(screen);const camera=cyl(.035,.02,mk('#1d2731'),12);camera.rotation.x=Math.PI/2;camera.position.set(0,.27,.075);g.add(camera);const home=cyl(.025,.018,mk('#d8e2ec'),12);home.rotation.x=Math.PI/2;home.position.set(0,-.25,.075);g.add(home);hitR=.6;break;}
+    case 'scan':{const bodyMat=mk('#e6b400'),screenMat=mk('#26384c'),beamMat=mk('#9be7ff');[-.42,.25,.82].forEach((x,i)=>{const unit=new THREE.Group();unit.position.set(x,0,i===1?.22:-.2);unit.rotation.z=-.16;g.add(unit);const body=box(.24,.58,.14,bodyMat);unit.add(body);const screen=box(.18,.2,.025,screenMat);screen.position.set(0,.12,.085);unit.add(screen);const grip=box(.13,.25,.14,bodyMat);grip.position.set(.04,-.38,0);grip.rotation.z=-.22;unit.add(grip);const beam=box(.15,.035,.04,beamMat);beam.position.set(0,-.31,.06);unit.add(beam);});hitR=1.15;break;}
+    case 'branch':{const p=box(4.2,.3,3,mk('#7a4fd6',{opacity:.55}));g.add(p);const r=box(.9,.35,.7,mk('#9d6af0'));r.position.set(-1.1,.35,0);g.add(r);const sw=box(1.1,.25,.8,mk('#119fd6'));sw.position.set(.4,.32,0);g.add(sw);const ap=cyl(.35,.12,mk('#f0f2f5'));ap.position.set(1.5,.6,0);g.add(ap);hitR=2.2;lblY=1.2;break;}
+    case 'vpn':{const ring=cyl(.5,.28,mk('#7d3fd8'),28);ring.rotation.x=Math.PI/2;g.add(ring);const inner=cyl(.24,.3,mk('#e8ddff'),24);inner.rotation.x=Math.PI/2;inner.position.z=.02;g.add(inner);for(let i=0;i<3;i++){const p=box(.12,.08,.08,mk('#d9caff'));p.position.set(-.28+i*.28,-.36,.05);g.add(p);}break;}
+    case 'vfw':{rackUnit('#d85c68',6,1.15);break;}
+    case 'lb':{const m=mk('#3183c7');g.add(cyl(.48,.55,m,8));for(let i=0;i<3;i++){const p=box(.45,.07,.08,mk('#d9f1ff'));p.position.set(0,.18-i*.18,.3);g.add(p);}break;}
+    case 'vm':{const m=mk('#4e7399');g.add(box(.82,.9,.65,m));const led=mk('#64e0a2');[-.24,0,.24].forEach(y=>{const l=box(.55,.045,.03,led);l.position.set(0,y,.34);g.add(l);});break;}
+    case 'db':{const m=mk('#e59a32');const top=cyl(.5,.16,m,24);top.position.y=.42;g.add(top);const body=new THREE.Mesh(new THREE.CylinderGeometry(.5,.5,.72,24,1,true),mk('#b87316'));g.add(body);const bottom=cyl(.5,.12,m,24);bottom.position.y=-.42;g.add(bottom);hitR=.85;lblY=.85;break;}
+    case 'storage':case 'vault':{const m=mk(n.type==='vault'?'#32a376':'#607f9e');g.add(box(.9,.65,.75,m));const lid=box(.96,.12,.8,mk('#cfe5f7'));lid.position.y=.38;g.add(lid);const lock=box(.16,.2,.08,mk('#f1c54a'));lock.position.set(0,.02,.42);g.add(lock);break;}
+    case 'dns':{const m=mk('#4f86c6');const globe=new THREE.Mesh(new THREE.SphereGeometry(.42,20,14),m);g.add(globe);const ring=new THREE.Mesh(new THREE.TorusGeometry(.5,.035,8,32),mk('#d7ebff'));ring.rotation.x=Math.PI/2;g.add(ring);hitR=.7;break;}
+  }
+  const hit=new THREE.Mesh(new THREE.SphereGeometry(hitR,10,8),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));
+  hit.userData.id=n.id;g.add(hit);hitMeshes.push(hit);
+  n.group=g;n.mats=mats;n.lblY=lblY;
+  g.position.set(...n.phys);
+  scene.add(g);
+}
+NODES.forEach(buildNode);
+
+/* ---------- physical scenery ---------- */
+const physObjs=[]; const logObjs=[];
+function fadeObj(list,obj,base){obj.material.transparent=true;obj.userData.baseOp=base;obj.material.opacity=base;list.push(obj);scene.add(obj);return obj;}
+const slabMat=()=>new THREE.MeshStandardMaterial({color:0x9fb3c8,transparent:true,opacity:.18,depthWrite:false});
+const edgeMat=()=>new THREE.LineBasicMaterial({color:0x6b8199,transparent:true,opacity:.6});
+function boxEdges(w,h,d,x,y,z,list,op){const e=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w,h,d)),edgeMat());e.position.set(x,y,z);return fadeObj(list,e,op||.55);}
+// HQ building
+for(let k=1;k<=5;k++){const s=new THREE.Mesh(new THREE.BoxGeometry(20,.18,13),slabMat());s.position.set(0,fy(k)-.09,0);fadeObj(physObjs,s,.22);}
+const roof=new THREE.Mesh(new THREE.BoxGeometry(20,.18,13),slabMat());roof.position.set(0,5*H-.09,0);fadeObj(physObjs,roof,.12);
+boxEdges(20,5*H,13,0,5*H/2-.09,0,physObjs,.5);
+// server room
+const sr=new THREE.Mesh(new THREE.BoxGeometry(9.2,3.0,3.6),new THREE.MeshStandardMaterial({color:0xf2b705,transparent:true,opacity:.14,depthWrite:false}));sr.position.set(-5.1,fy(2)+1.5,-3.5);fadeObj(physObjs,sr,.14);
+boxEdges(9.2,3.0,3.6,-5.1,fy(2)+1.5,-3.5,physObjs,.7);
+[-8.5,-6.8,-5.1,-3.4,-1.7].forEach(x=>boxEdges(1.55,2.6,1.3,x,fy(2)+1.3,-3.5,physObjs,.35));
+for(let k=1;k<=5;k++)boxEdges(1.5,1.4,1.2,-8.5,fy(k)+1.2,4.2,physObjs,.35);
+// riser
+const riser=new THREE.Mesh(new THREE.BoxGeometry(.25,5*H,.25),new THREE.MeshStandardMaterial({color:0x0d97a6,transparent:true,opacity:.35}));riser.position.set(-9.6,5*H/2,4.2);fadeObj(physObjs,riser,.35);
+// warehouse
+const wh=new THREE.Mesh(new THREE.BoxGeometry(22,9,18),new THREE.MeshStandardMaterial({color:0xc9a35a,transparent:true,opacity:.08,depthWrite:false}));wh.position.set(24,4.5,0);fadeObj(physObjs,wh,.08);
+boxEdges(22,9,18,24,4.5,0,physObjs,.5);
+for(let i=0;i<4;i++){const r=new THREE.Mesh(new THREE.BoxGeometry(14,4.5,1.2),new THREE.MeshStandardMaterial({color:0xd08a3a,transparent:true,opacity:.35}));r.position.set(25,2.25,-7+i*4.4);fadeObj(physObjs,r,.35);}
+const vpcShell=new THREE.Mesh(new THREE.BoxGeometry(16,5,12),new THREE.MeshStandardMaterial({color:0x3b82f6,transparent:true,opacity:.045,depthWrite:false}));vpcShell.position.set(14,25,-15);fadeObj(physObjs,vpcShell,.045);
+boxEdges(16,5,12,14,25,-15,physObjs,.72);
+boxEdges(15,4.5,5.5,14,25,-18.25,physObjs,.4);boxEdges(15,4.5,5.5,14,25,-11.75,physObjs,.4);
+// ground
+const grid=new THREE.GridHelper(110,44,0x8899aa,0x8899aa);grid.position.set(-4,-.2,0);grid.material.transparent=true;fadeObj(physObjs,grid,.18);
+// logical tiers
+const TIERS=[[24.5,'Edge: Internet 2 ISP'],[19.5,'Security: Firewall HA'],[14.5,'Core Layer'],[9.5,'Distribution Layer + Server Block'],[4,'Access Layer (PoE+)'],[-0.5,'Wireless และอุปกรณ์ปลายทาง']];
+TIERS.forEach(([y])=>{const p=new THREE.Mesh(new THREE.BoxGeometry(42,.08,22),new THREE.MeshStandardMaterial({color:0x7f93a8,transparent:true,opacity:0,depthWrite:false}));p.position.set(-3,y-.55,-1);fadeObj(logObjs,p,.12);p.material.opacity=0;});
+
+/* ---------- link objects ---------- */
+const SEG=32;
+const pktGeo=new THREE.SphereGeometry(.14,10,8);
+LINKS.forEach((l,i)=>{
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array((SEG+1)*3),3));
+  const mat=DASHED[l.type]?new THREE.LineDashedMaterial({color:0xffffff,dashSize:.45,gapSize:.3,transparent:true}):new THREE.LineBasicMaterial({color:0xffffff,transparent:true});
+  const line=new THREE.Line(geo,mat);line.frustumCulled=false;scene.add(line);
+  l.line=line;l.pts=[];for(let j=0;j<=SEG;j++)l.pts.push(new THREE.Vector3());
+  if(l.type!=='ha'){const p=new THREE.Mesh(pktGeo,new THREE.MeshBasicMaterial({color:0xffffff}));scene.add(p);l.pkt=p;l.t=Math.random();l.dir=(i%2)?1:-1;}
+});
+
+/* ---------- state ---------- */
+const S={view:0,viewTarget:0,labels:2,scenario:'normal',failed:new Set(),blocked:new Set(),hl:null,remap:{},select:null,spin:false};
+function effId(l,id){return (S.remap[id]&&(l.type==='vpn'||l.type==='repl'))?S.remap[id]:id;}
+const tmpA=new THREE.Vector3(),tmpB=new THREE.Vector3(),tmpM=new THREE.Vector3();
+function updateLinks(){
+  LINKS.forEach(l=>{
+    tmpA.copy(N[effId(l,l.a)].group.position);tmpB.copy(N[effId(l,l.b)].group.position);
+    const c=CURVED[l.type]; const arr=l.line.geometry.attributes.position.array;
+    if(c){tmpM.addVectors(tmpA,tmpB).multiplyScalar(.5);tmpM.y+=tmpA.distanceTo(tmpB)*c;}
+    for(let j=0;j<=SEG;j++){const t=j/SEG,p=l.pts[j];
+      if(c){const u=1-t;p.set(u*u*tmpA.x+2*u*t*tmpM.x+t*t*tmpB.x,u*u*tmpA.y+2*u*t*tmpM.y+t*t*tmpB.y,u*u*tmpA.z+2*u*t*tmpM.z+t*t*tmpB.z);}
+      else p.lerpVectors(tmpA,tmpB,t);
+      arr[j*3]=p.x;arr[j*3+1]=p.y;arr[j*3+2]=p.z;}
+    l.line.geometry.attributes.position.needsUpdate=true;
+    if(DASHED[l.type])l.line.computeLineDistances();
+    let len=0;for(let j=1;j<=SEG;j++)len+=l.pts[j].distanceTo(l.pts[j-1]);l.len=Math.max(len,.5);
+  });
+}
+
+const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+function placeNodes(){
+  const e=ease(S.view);
+  NODES.forEach(n=>{const p=n.phys,q=n.log;n.group.position.set(p[0]+(q[0]-p[0])*e,p[1]+(q[1]-p[1])*e,p[2]+(q[2]-p[2])*e);
+    const big=(n.type==='cloud'||n.type==='dr'||n.type==='branch')?1:1+.45*e;n.group.scale.setScalar(big);});
+  physObjs.forEach(o=>{o.material.opacity=o.userData.baseOp*(1-e);o.visible=e<.98;});
+  logObjs.forEach(o=>{o.material.opacity=o.userData.baseOp*e;o.visible=e>.02;});
+}
+
+/* ---------- visual state ---------- */
+const RED=new THREE.Color('#e04444');
+function linkHighlighted(l){if(!S.hl)return null;const a=effId(l,l.a),b=effId(l,l.b);return S.hl.has(a)&&S.hl.has(b);}
+function applyState(){
+  // neighbor selection highlight when no scenario path
+  if(S.select&&!S.scenHl){const set=new Set([S.select]);LINKS.forEach(l=>{if(l.a===S.select)set.add(l.b);if(l.b===S.select)set.add(l.a);});S.hl=set;S.selMode=true;}
+  else if(!S.scenHl){S.hl=null;S.selMode=false;}
+  NODES.forEach(n=>{
+    const failed=S.failed.has(n.id), blocked=S.blocked.has(n.id);
+    const dim=S.hl&&!S.hl.has(n.id)&&!failed&&!blocked;
+    n.mats.forEach(m=>{
+      if(failed||blocked){m.color.copy(m.userData.base).lerp(RED,.75);m.emissive.set(failed?0x5a0000:0x3a0000);m.opacity=failed?.75:.9;}
+      else{m.color.copy(m.userData.base);m.emissive.set(0x000000);m.opacity=dim?.14:(m.userData.baseOp0||1);}
+    });
+    n.dim=dim;n.down=failed;n.blocked=blocked;
+  });
+  LINKS.forEach(l=>{
+    const a=effId(l,l.a),b=effId(l,l.b);
+    const down=S.failed.has(a)||S.failed.has(b);
+    let h=linkHighlighted(l); if(S.selMode&&S.hl) h=(a===S.select||b===S.select);
+    const col=down?PAL.down:PAL[l.type];
+    l.line.material.color.set(col);
+    l.line.material.opacity=down?.35:(S.hl?(h?1:.06):.7);
+    l.down=down;l.hi=!!h;
+    if(l.pkt){l.pkt.material.color.set(PAL[l.type]);l.pkt.visible=!down&&(!S.hl||h);l.pkt.scale.setScalar(S.hl&&h?1.5:1);}
+  });
+  updateLinks();
+}
+
+/* ---------- labels ---------- */
+const labelItems=[];
+function mkLabel(text,cls,getPos,node){const el=document.createElement('div');el.className='lbl '+cls;el.textContent=text;labelsEl.appendChild(el);const it={el,getPos,node,cls};labelItems.push(it);return it;}
+NODES.forEach(n=>mkLabel(n.label,n.major?'major':'minor',v=>v.copy(n.group.position).add(new THREE.Vector3(0,n.lblY*n.group.scale.y+.35,0)),n));
+for(let k=1;k<=5;k++)mkLabel('ชั้น '+k+(k===2?' (ห้อง Server)':''),'zone phys',v=>v.set(11.2,fy(k)+1,6.5));
+mkLabel('อาคารสำนักงานใหญ่ 5 ชั้น','zone phys',v=>v.set(0,5*H+1.2,6.5));
+mkLabel('คลังสินค้า','zone phys',v=>v.set(24,9.8,9));
+mkLabel('ISP B เข้าอาคารอีกด้าน','zone phys',v=>v.set(-2,-1.2,-12));
+mkLabel('Cloud DR · VPC','zone phys',v=>v.set(14,27.8,-15));
+mkLabel('AZ-A','zone phys',v=>v.set(9,27.3,-18));mkLabel('AZ-B','zone phys',v=>v.set(9,27.3,-12));
+TIERS.forEach(([y,t])=>mkLabel(t,'tier log',v=>v.set(-24.5,y,9.5)));
+const projV=new THREE.Vector3();
+function updateLabels(w,h){
+  const e=S.view;
+  labelItems.forEach(it=>{
+    let show=true;
+    if(it.cls.includes('phys'))show=e<.5;
+    else if(it.cls.includes('log'))show=e>.5;
+    else if(it.node){show=S.labels===2||(S.labels===1&&(it.node.major||S.hl&&S.hl.has(it.node.id)||it.node.down));}
+    if(!show){it.el.classList.add('hide');return;}
+    it.getPos(projV);projV.project(camera);
+    if(projV.z>1){it.el.classList.add('hide');return;}
+    it.el.classList.remove('hide');
+    const x=(projV.x*.5+.5)*w,y=(-projV.y*.5+.5)*h;
+    it.el.style.transform='translate('+Math.round(x)+'px,'+Math.round(y)+'px) translate(-50%,-100%)';
+    if(it.node){it.el.classList.toggle('dim',!!it.node.dim);it.el.classList.toggle('down',!!(it.node.down||it.node.blocked));it.el.classList.add('type-'+it.node.type);}
+  });
+}
+
+/* ---------- camera controls ---------- */
+const views=[{target:new THREE.Vector3(-4,6,0),r:84,theta:.55,phi:1.12},{target:new THREE.Vector3(-4,12,0),r:80,theta:.25,phi:1.22}];
+const cam={target:views[0].target.clone(),r:views[0].r,theta:views[0].theta,phi:views[0].phi};
+let camTween=null;
+function goView(i){const v=views[i];camTween={from:{t:cam.target.clone(),r:cam.r,th:cam.theta,ph:cam.phi},to:v,s:0};}
+function placeCamera(){const sp=Math.sin(cam.phi);camera.position.set(cam.target.x+cam.r*sp*Math.sin(cam.theta),cam.target.y+cam.r*Math.cos(cam.phi),cam.target.z+cam.r*sp*Math.cos(cam.theta));camera.lookAt(cam.target);}
+const pointers=new Map(); let downAt=null, pinch0=0, moved=0;
+canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY,b:e.button,shift:e.shiftKey});downAt={x:e.clientX,y:e.clientY};moved=0;canvas.classList.add('dragging');camTween=null;
+  if(pointers.size===2){const [p,q]=[...pointers.values()];pinch0=Math.hypot(p.x-q.x,p.y-q.y);}});
+canvas.addEventListener('pointermove',e=>{
+  if(!pointers.has(e.pointerId)){hover(e);return;}
+  const p=pointers.get(e.pointerId);const dx=e.clientX-p.x,dy=e.clientY-p.y;moved+=Math.abs(dx)+Math.abs(dy);
+  if(pointers.size===2){p.x=e.clientX;p.y=e.clientY;const [a,b]=[...pointers.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);if(pinch0>0){cam.r=Math.min(170,Math.max(18,cam.r*pinch0/d));}pinch0=d;return;}
+  if(p.b===2||p.shift||e.shiftKey){const s=cam.r*.0016;const right=new THREE.Vector3().setFromMatrixColumn(camera.matrix,0);const up=new THREE.Vector3().setFromMatrixColumn(camera.matrix,1);cam.target.addScaledVector(right,-dx*s).addScaledVector(up,dy*s);}
+  else{cam.theta-=dx*.006;cam.phi=Math.min(1.52,Math.max(.25,cam.phi-dy*.005));}
+  p.x=e.clientX;p.y=e.clientY;});
+function endPtr(e){if(!pointers.has(e.pointerId))return;pointers.delete(e.pointerId);if(pointers.size===0)canvas.classList.remove('dragging');
+  if(e.type==='pointerup'&&moved<6&&downAt&&pointers.size===0)pick(e);}
+canvas.addEventListener('pointerup',endPtr);canvas.addEventListener('pointercancel',endPtr);
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+canvas.addEventListener('wheel',e=>{e.preventDefault();cam.r=Math.min(170,Math.max(18,cam.r*(1+Math.sign(e.deltaY)*Math.min(Math.abs(e.deltaY),120)*.001)));camTween=null;},{passive:false});
+const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
+function hitTest(e){const r=canvas.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(ndc,camera);const hits=ray.intersectObjects(hitMeshes,false);return hits.length?hits[0].object.userData.id:null;}
+function hover(e){canvas.style.cursor=hitTest(e)?'pointer':'grab';}
+function pick(e){const id=hitTest(e);S.select=id;applyState();renderPanel();}
+
+/* ---------- scenarios ---------- */
+const HQ_IDS=NODES.filter(n=>!['INTERNET','M365'].includes(n.id)&&!n.id.startsWith('CLOUD-')&&!n.id.startsWith('BR-')).map(n=>n.id);
+const SC={
+  normal:{name:'ภาวะปกติ',cls:'',html:'<p>ทุกอุปกรณ์ทำงานคู่กัน ทราฟฟิกกระจายผ่านทั้ง 2 เส้นทาง จุดที่วิ่งบนสายคือข้อมูลที่กำลังส่ง</p><p>คลิกอุปกรณ์ใดก็ได้เพื่อดูหน้าที่ จำนวน และเหตุผลที่เลือก อุปกรณ์ที่เชื่อมกับตัวนั้นจะถูกเน้นให้เห็น</p>'},
+  core:{name:'Core #1 เสีย',cls:'bad',failed:['CORE1'],html:'<p><b>เกิดอะไรขึ้น:</b> Core Switch ตัวที่ 1 ดับ ลิงก์ทั้งหมดที่ต่อกับมันเป็นสีแดง</p><p><b>ระบบรับมืออย่างไร:</b> Firewall, Distribution และ Server Switch ทุกตัวต่อสายไปที่ Core 2 อยู่แล้ว (MLAG) ทราฟฟิกจึงวิ่งผ่าน Core 2 ต่อทันที ใช้เวลาไม่ถึง 1 วินาที</p><p><b>ผลต่อธุรกิจ:</b> พนักงานและคลังไม่รู้สึกถึงปัญหา ทีม IT ได้รับแจ้งเตือนและเปลี่ยนเครื่องตามสัญญา MA</p>'},
+  fw:{name:'Firewall #1 เสีย',cls:'bad',failed:['FW1'],remap:{FW1:'FW2'},html:'<p><b>เกิดอะไรขึ้น:</b> Firewall ตัว Active ดับ</p><p><b>ระบบรับมืออย่างไร:</b> Firewall 2 ซึ่งซิงค์ Session ไว้ตลอด (เส้นประสีเหลือง) ขึ้นเป็น Active ภายใน 1–3 วินาที อุโมงค์ของสาขาและ Replication ไป Cloud ย้ายมาที่ Firewall 2 อัตโนมัติ (ดูเส้นสีม่วงและเขียวที่ย้ายปลายทาง)</p><p><b>ผลต่อธุรกิจ:</b> การใช้งาน Internet, M365 และ ERP จากสาขาไม่หยุด</p>'},
+  isp:{name:'ISP A ล่ม',cls:'bad',failed:['ISP-A'],html:'<p><b>เกิดอะไรขึ้น:</b> ผู้ให้บริการ Internet รายแรกล่ม เช่น สายถูกตัด</p><p><b>ระบบรับมืออย่างไร:</b> Firewall ตรวจพบว่าลิงก์ไม่ตอบสนอง และส่งทราฟฟิกทั้งหมดออก ISP B ซึ่งเข้าอาคารจากอีกด้านหนึ่ง ใช้เวลาประมาณ 3–10 วินาที</p><p><b>ผลต่อธุรกิจ:</b> วิดีโอคอลอาจกระตุกครู่เดียว งานอื่นดำเนินต่อ ความเร็วรวมลดลงจนกว่า ISP A จะกลับมา</p>'},
+  guest:{name:'เส้นทาง Wi-Fi แขก',cls:'good',hl:['GUEST','AP-F1','AS-F1','DS-OFF1','CORE1','FW1','ISP-A','INTERNET'],blocked:['SRV-ERP','SRV-FILE','NVR'],html:'<p><b>เส้นทาง:</b> มือถือแขก → AP → Switch → ส่งต่อแบบ Layer 2 ผ่าน Distribution และ Core โดยไม่ถูก Route ภายใน → Firewall (Gateway ของ VLAN 90) → Internet</p><p><b>ถูกบล็อก (สีแดง):</b> ERP, File Server และ NVR แขกไม่มีเส้นทางไปถึงเลย เพราะ VLAN 90 ไม่มี Gateway บน Core และ Firewall อนุญาตเฉพาะออก Internet</p><p><b>ผลต่อธุรกิจ:</b> ให้ Wi-Fi ลูกค้าและคนขับรถได้โดยไม่เสี่ยงข้อมูลบริษัท</p>'},
+  scan:{name:'Scanner → ERP',cls:'good',hl:['EP-WH','AP-WH1','AP-WH2','AP-WH3','AS-WH1','AS-WH2','AS-WH3','DS-WH1','DS-WH2','CORE1','CORE2','DC1','DC2','SRV-ERP'],html:'<p><b>เส้นทาง:</b> Scanner → AP ในคลัง (VLAN 70) → Access คลัง → Distribution คลัง (ตรวจ ACL: อนุญาตเฉพาะ ERP) → Core → Server Switch → ERP</p><p>ทุกช่วงมี 2 เส้นทาง และ Scanner ย้าย AP ได้เร็วด้วย 802.11r/k/v ขณะเดินทั่วคลัง</p><p><b>ผลต่อธุรกิจ:</b> การยิงรับ–จ่ายสินค้าไม่สะดุด แม้อุปกรณ์ตัวใดตัวหนึ่งในเส้นทางเสีย</p>'},
+  branch:{name:'สาขา → ERP',cls:'good',hl:['BR-CBI','BR-CBI-EP','BR-KKN','BR-KKN-EP','BR-CNX','BR-CNX-EP','FW1','CORE1','CORE2','DC1','DC2','SRV-ERP'],html:'<p><b>เส้นทาง:</b> Endpoint สาขา → SD-WAN Edge → IPsec → Firewall HQ → Core → Server Switch → ERP; Fiber สำรองด้วย 4G/5G และมี Cloud DR tunnel</p><p>ข้อมูลเข้ารหัสระหว่างเดินทางผ่าน Internet</p>'},
+  repl:{name:'Replication ไป Cloud',cls:'good',hl:['SRV-ERP','SRV-FILE','DC1','CORE1','FW1','CLOUD-VPN','CLOUD-FW1','CLOUD-DB','CLOUD-FILE','CLOUD-VAULT'],html:'<p><b>ภาวะปกติ:</b> ERP ส่งข้อมูลไป Database Replica ตาม RPO 15 นาที, File ส่ง Snapshot ทุกชั่วโมง และสำรองเข้า Immutable Vault ผ่าน VPN Gateway กับ Virtual Firewall</p><p>ระบบวางข้าม Availability Zone; ทดสอบ Promote, Restore และสิทธิ์ของ Vault ระหว่างซ้อม DR</p>'},
+  dr:{name:'HQ ล่ม → เปิด DR',cls:'bad',failed:HQ_IDS,hl:['BR-CBI','BR-CBI-EP','BR-KKN','BR-KKN-EP','BR-CNX','BR-CNX-EP','INTERNET','CLOUD-DR','CLOUD-VPN','CLOUD-FW1','CLOUD-FW2','CLOUD-LB','CLOUD-APP1','CLOUD-APP2','CLOUD-DB','CLOUD-FILE','CLOUD-VAULT','CLOUD-DNS','M365'],html:'<p><b>ลำดับ DR:</b> Promote Database Replica → เปิด ERP App VM ในสอง Availability Zones → Health Check ผ่าน Load Balancer → เปลี่ยน DNS → สาขาเข้า Cloud ผ่าน VPN Gateway</p><p><b>RTO ≤ 4 ชั่วโมง, RPO ≤ 15 นาที:</b> เป็นเป้าหมายที่ต้องยืนยันด้วยการซ้อม DR จริง</p>'}
+};
+const scenList=document.getElementById('scenList');
+Object.entries(SC).forEach(([k,v])=>{const b=document.createElement('button');b.textContent=v.name;b.dataset.k=k;b.setAttribute('aria-pressed',k==='normal');b.onclick=()=>setScenario(k);scenList.appendChild(b);});
+function setScenario(k){
+  const v=SC[k];S.scenario=k;S.failed=new Set(v.failed||[]);S.blocked=new Set(v.blocked||[]);S.remap=v.remap||{};
+  S.scenHl=v.hl?new Set(v.hl):null;S.hl=S.scenHl;S.select=null;
+  scenList.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===k));
+  applyState();renderPanel();
+}
+function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function haFor(n){
+  switch(n.type){
+    case 'core': return ['มี HA','Core 2 ตัวทำงานแบบ MLAG; เมื่อเครื่องหนึ่งล้ม อีกเครื่องรับเส้นทางต่อ'];
+    case 'dist': return ['มี HA','Distribution เป็นคู่ ใช้ VRRP และมี Uplink ไป Core ทั้งสองตัว'];
+    case 'dcsw': return ['มี HA ตามการตั้งค่า','Server ต่อ NIC ไป Switch คนละตัว; ต้องตั้ง NIC Teaming และกระจาย Host/Storage path เพื่อให้สลับเส้นทางได้'];
+    case 'access': return ['มี HA แต่ปลายทางที่ต่ออยู่ยังสะดุด',n.id.startsWith('AS-WH')?'Switch 2 ตัวทำ Stack ต่อ Uplink ไป Distribution คนละตัว; เครื่องที่เสียบกับสมาชิกที่ดับอาจหลุดจนย้ายสาย':'Switch 3 ตัวทำ Stack ต่อ Uplink ไป Distribution คนละตัว; เครื่องที่เสียบกับสมาชิกที่ดับอาจหลุดจนย้ายสาย'];
+    case 'fw': return ['มี HA','Firewall 2 ตัวแบบ Active/Standby พร้อมซิงค์ Session'];
+    case 'isp': return ['มี HA','มี ISP สองรายและเส้นทางเข้าตึกคนละทาง; Firewall/SD-WAN ย้ายทราฟฟิกเมื่อเส้นหนึ่งล่ม'];
+    case 'ap': return ['มีสัญญาณทับซ้อน','ออกแบบให้พื้นที่ทับซ้อนกับ AP ข้างเคียง; หาก AP เสีย ความเร็วหรือความครอบคลุมอาจลดลง'];
+    case 'branch': return ['WAN มีทางสำรอง แต่ Edge มีตัวเดียว','มี Fiber และ 4G/5G พร้อมอุโมงค์ไป HQ/Cloud แต่ SD-WAN Edge มี 1 ตัวต่อสาขา; หากตัวนี้เสีย สาขาจะขาดการเชื่อมต่อจนเปลี่ยนอุปกรณ์'];
+    case 'server': return ['มี HA / DR ตามการตั้งค่า','ERP อยู่บน Virtualization Cluster และมี Cloud DR; File มี Snapshot/Backup. ต้องตรวจสอบ HA ของ Host, Storage และฐานข้อมูลตอนติดตั้งจริง'];
+    case 'vpn': return ['มีทางเชื่อมสำรอง','VPN Gateway รับ Tunnel จาก HQ และสาขา; ต้องยืนยัน Multi-AZ failover กับผู้ให้บริการ Cloud'];
+    case 'vfw': return ['มี HA','Virtual Firewall สองโหนดข้าม Availability Zone; ต้องซิงค์ Policy และ Log'];
+    case 'lb': return ['มี HA','Managed Load Balancer กระจายทราฟฟิกข้าม Availability Zone และตรวจ Health Check'];
+    case 'vm': return ['มีโหนดสำรอง','ERP App VM สองโหนดข้าม Availability Zone; เปิดเมื่อประกาศ DR ตาม Runbook'];
+    case 'db': return ['มีสำเนา DR','Database Replica เป็น Asynchronous; RPO เป้าหมาย ≤ 15 นาที และต้อง Promote พร้อมตรวจ consistency'];
+    case 'storage': return ['มีสำเนาข้อมูล','File replica รับ Snapshot/Replication; ต้องทดสอบ Restore และสิทธิ์การเข้าถึง'];
+    case 'vault': return ['สำรองแบบ Immutable','Object Lock/Retention แยกบัญชีจาก Production; ป้องกันการลบ Backup แต่ยังต้องทดสอบกู้คืน'];
+    case 'dns': return ['มี Health Check','ตรวจ endpoint และเปลี่ยน DNS หลังอนุมัติ DR; TTL และ DNS cache มีผลต่อเวลาสลับ'];
+    case 'dr': return ['ฐาน Cloud วางข้าม 2 AZ','แยก Transit, App, Data และ Management/Logs; DB อยู่ Private Data subnet, ใช้ IAM/MFA/KMS และส่ง Audit/Flow Logs ไปเก็บแยก'];
+    case 'endpoint':case 'ep':case 'scan': return ['ไม่มี HA ที่ตัวอุปกรณ์','เมื่อ Endpoint เสียจะต้องเปลี่ยนหรือใช้เครื่องสำรอง; เครือข่ายสำรองไม่ทำให้อุปกรณ์ปลายทางทำงานแทนกัน'];
+    default: return ['ไม่มีอุปกรณ์สำรองเฉพาะ','อุปกรณ์ปลายทางหรือบริการนี้ไม่มีอุปกรณ์สำรองเฉพาะในโมเดล'];
+  }
+}
+function renderPanel(){
+  const side=document.querySelector('.side');
+  if(!S.select){side.classList.remove('has-selection');panel.innerHTML='';return;}
+  const n=N[S.select],i=n.info,[haTitle,haText]=haFor(n),gap=haTitle.includes('แต่')||haTitle.startsWith('ไม่มี');
+  let h='<div class="detail-head"><div><h3>'+esc(i.t||n.label)+'</h3><span class="layer">'+esc(i.layer||n.type)+'</span></div><button class="panel-close" type="button" aria-label="ปิดรายละเอียด">×</button></div>';
+  h+='<div class="ha-state '+(gap?'gap':'')+'"><b>'+esc(haTitle)+'</b><br>'+esc(haText)+'</div>';
+  h+='<div class="detail-label">จำนวน / สเปก</div><p class="detail-value">'+esc(i.qty||'—')+'</p><div class="detail-label">หน้าที่</div><p class="detail-value">'+esc(i.role||'—')+'</p><div class="detail-label">เหตุผลการออกแบบ</div><p class="detail-value">'+esc(i.why||'—')+'</p>';
+  if(S.failed.has(n.id))h+='<p style="color:var(--red);font-weight:600">อุปกรณ์นี้เสียในสถานการณ์ปัจจุบัน</p>';
+  panel.innerHTML=h;side.classList.add('has-selection');
+  panel.querySelector('.panel-close').onclick=()=>{S.select=null;applyState();renderPanel();};
+}
+
+/* ---------- toolbar ---------- */
+const vPhys=document.getElementById('vPhys'),vLog=document.getElementById('vLog');
+function setView(i){S.viewTarget=i;vPhys.setAttribute('aria-pressed',i===0);vLog.setAttribute('aria-pressed',i===1);goView(i);if(reduceMotion){S.view=i;placeNodes();updateLinks();}}
+vPhys.onclick=()=>setView(0);vLog.onclick=()=>setView(1);
+const bLabels=document.getElementById('bLabels');const LBL=['ชื่อ: ปิด','ชื่อ: อุปกรณ์หลัก','ชื่อ: ทั้งหมด'];
+bLabels.onclick=()=>{S.labels=(S.labels+1)%3;bLabels.textContent=LBL[S.labels];};
+document.getElementById('bReset').onclick=()=>goView(S.viewTarget);
+document.getElementById('bCloud').onclick=()=>{camTween={from:{t:cam.target.clone(),r:cam.r,th:cam.theta,ph:cam.phi},to:{target:new THREE.Vector3(14,25,-15),r:30,theta:.58,phi:1.15},s:0};};
+const bSpin=document.getElementById('bSpin');bSpin.onclick=()=>{S.spin=!S.spin;bSpin.setAttribute('aria-pressed',S.spin);};
+
+/* ---------- theme ---------- */
+function applyTheme(){
+  const dark=window.matchMedia('(prefers-color-scheme: dark)').matches&&document.documentElement.dataset.theme!=='light'||document.documentElement.dataset.theme==='dark';
+  PAL=dark?PAL_DARK:PAL_LIGHT;
+  physObjs.concat(logObjs).forEach(o=>{if(o.isLineSegments)o.material.color.set(dark?0x7d93ab:0x5d7186);});
+  grid.material.color&&grid.material.color.set(dark?0x3a4b5e:0x9aabbd);
+  applyState();
+}
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
+
+/* ---------- resize & loop ---------- */
+let W=1,Hh=1;
+function resize(){const r=stage.getBoundingClientRect();W=Math.max(1,r.width);Hh=Math.max(1,r.height);renderer.setSize(W,Hh,false);camera.aspect=W/Hh;camera.updateProjectionMatrix();}
+new ResizeObserver(resize).observe(stage);resize();
+
+placeNodes();applyTheme();renderPanel();placeCamera();
+let last=performance.now();
+function sample(l,t,out){const f=t*SEG,i=Math.min(SEG-1,Math.floor(f));out.lerpVectors(l.pts[i],l.pts[i+1],f-i);}
+function frame(now){
+  const dt=Math.min(.05,(now-last)/1000);last=now;
+  if(S.view!==S.viewTarget){const d=S.viewTarget>S.view?1:-1;S.view=Math.min(1,Math.max(0,S.view+d*dt/1.3));placeNodes();updateLinks();}
+  if(camTween){camTween.s=Math.min(1,camTween.s+dt/1.3);const e=ease(camTween.s),f=camTween.from,t=camTween.to;
+    cam.target.lerpVectors(f.t,t.target,e);cam.r=f.r+(t.r-f.r)*e;cam.theta=f.th+(t.theta-f.th)*e;cam.phi=f.ph+(t.phi-f.ph)*e;if(camTween.s>=1)camTween=null;}
+  if(S.spin&&!pointers.size)cam.theta+=dt*.12;
+  placeCamera();
+  if(!reduceMotion)LINKS.forEach(l=>{if(!l.pkt||!l.pkt.visible)return;const sp=(l.hi?9:6)/l.len;l.t+=dt*sp*l.dir;if(l.t>1)l.t-=1;if(l.t<0)l.t+=1;sample(l,l.t,l.pkt.position);});
+  else LINKS.forEach(l=>{if(l.pkt)sample(l,.5,l.pkt.position);});
+  renderer.render(scene,camera);
+  updateLabels(W,Hh);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
